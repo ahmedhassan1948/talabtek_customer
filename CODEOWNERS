@@ -1,0 +1,68 @@
+# طلبك - مالكو الكود
+# Talabtek - Code Owners
+
+# الملفات الأساسية - مراجعة من الفريق الأساسي
+* @talabtek-core-team
+
+# التكوين الأساسي
+/core/config/ @talabtek-core-team
+/core/constants/ @talabtek-core-team
+/core/theme/ @talabtek-core-team
+/main.dart @talabtek-core-team
+
+# المصادقة
+/features/auth/ @talabtek-auth-team
+
+# الشاشة الرئيسية والمطاعم
+/features/home/ @talabtek-home-team
+/features/restaurant/ @talabtek-restaurant-team
+
+# السلة والدفع
+/features/cart/ @talabtek-payments-team
+/features/order/ @talabtek-orders-team
+
+# الملف الشخصي والإعدادات
+/features/profile/ @talabtek-profile-team
+/features/notifications/ @talabtek-notifications-team
+/features/support/ @talabtek-support-team
+
+# الخدمات المشتركة
+/shared/providers/ @talabtek-core-team
+/shared/services/ @talabtek-core-team
+/shared/models/ @talabtek-core-team
+/shared/widgets/ @talabtek-ui-team
+
+# Firebase والأمان
+/firestore.rules @talabtek-security-team
+/storage.rules @talabtek-security-team
+/android/app/google-services.json @talabtek-security-team
+/ios/Runner/GoogleService-Info.plist @talabtek-security-team
+/lib/core/config/firebase_options.dart @talabtek-security-team
+
+# CI/CD والنشر
+/.github/workflows/ @talabtek-devops-team
+/fastlane/ @talabtek-devops-team
+/docker-compose.yml @talabtek-devops-team
+/Dockerfile.web @talabtek-devops-team
+
+# التوثيق
+/README.md @talabtek-docs-team
+/CONTRIBUTING.md @talabtek-docs-team
+/CHANGELOG.md @talabtek-docs-team
+
+# الاختبارات
+/test/ @talabtek-qa-team
+/integration_test/ @talabtek-qa-team
+
+# التبعيات
+/pubspec.yaml @talabtek-core-team
+/pubspec.lock @talabtek-core-team
+/android/app/build.gradle @talabtek-android-team
+/ios/Podfile @talabtek-ios-team
+
+# ملفات التكوين الحساسة
+/.env* @talabtek-security-team
+/google-services.json @talabtek-security-team
+/GoogleService-Info.plist @talabtek-security-team
+/android/key.properties @talabtek-security-team
+/android/upload-keystore.jks @talabtek-security-team

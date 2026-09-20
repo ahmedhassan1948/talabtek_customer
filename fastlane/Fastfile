@@ -1,0 +1,64 @@
+# frozen_string_literal: true
+
+default_platform(:ios)
+
+platform :ios do
+  desc "Deploy to Firebase App Distribution"
+  lane :firebase_distribution do
+    firebase_app_distribution(
+      app: ENV['FIREBASE_IOS_APP_ID'],
+      firebase_cli_token: ENV['FIREBASE_TOKEN'],
+      groups: "testers",
+      release_notes: "New build from Fastlane",
+      ipa_path: "../build/ios/Runner.ipa"
+    )
+  end
+
+  desc "Build release IPA"
+  lane :build_release do
+    build_ios_app(
+      workspace: "Runner.xcworkspace",
+      scheme: "Runner",
+      configuration: "Release",
+      export_method: "app-store",
+      output_directory: "../build/ios",
+      output_name: "Runner.ipa"
+    )
+  end
+
+  desc "Deploy to TestFlight"
+  lane :testflight do
+    build_ios_app(
+      workspace: "Runner.xcworkspace",
+      scheme: "Runner",
+      configuration: "Release",
+      export_method: "app-store",
+      output_directory: "../build/ios",
+      output_name: "Runner.ipa"
+    )
+    
+    upload_to_testflight(
+      api_key_path: "../fastlane/appstore-connect-api-key.json",
+      skip_waiting_for_build_processing: true
+    )
+  end
+
+  desc "Deploy to App Store"
+  lane :appstore do
+    build_ios_app(
+      workspace: "Runner.xcworkspace",
+      scheme: "Runner",
+      configuration: "Release",
+      export_method: "app-store",
+      output_directory: "../build/ios",
+      output_name: "Runner.ipa"
+    )
+    
+    upload_to_app_store(
+      api_key_path: "../fastlane/appstore-connect-api-key.json",
+      skip_metadata: false,
+      skip_screenshots: false,
+      force: true
+    )
+  end
+end

@@ -1,0 +1,103 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    // Helper functions
+    function isSignedIn() {
+      return request.auth != null;
+    }
+    
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+    
+    function isAdmin() {
+      return isSignedIn() && 
+        firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.role == 'admin';
+    }
+    
+    function isRestaurantOwner(restaurantId) {
+      return isSignedIn() && 
+        firestore.exists(/databases/(default)/documents/restaurants/$(restaurantId)) &&
+        firestore.get(/databases/(default)/documents/restaurants/$(restaurantId)).data.ownerId == request.auth.uid;
+    }
+
+    // User profile images
+    match /users/{userId}/profile/{fileName} {
+      allow read: if true;
+      allow write: if isOwner(userId) && 
+        request.resource.size < 5 * 1024 * 1024 && // 5MB max
+        request.resource.contentType.matches('image/.*');
+    }
+
+    // Restaurant images
+    match /restaurants/{restaurantId}/{fileName} {
+      allow read: if true;
+      allow write: if isRestaurantOwner(restaurantId) && 
+        request.resource.size < 10 * 1024 * 1024 && // 10MB max
+        request.resource.contentType.matches('image/.*');
+    }
+
+    // Product images
+    match /products/{productId}/{fileName} {
+      allow read: if true;
+      allow write: if isSignedIn() && 
+        request.resource.size < 5 * 1024 * 1024 &&
+        request.resource.contentType.matches('image/.*');
+    }
+
+    // Driver documents (license, vehicle registration, etc.)
+    match /drivers/{driverId}/documents/{fileName} {
+      allow read: if isOwner(driverId) || isAdmin();
+      allow write: if isOwner(driverId) && 
+        request.resource.size < 10 * 1024 * 1024 &&
+        (request.resource.contentType.matches('image/.*') || 
+         request.resource.contentType == 'application/pdf');
+    }
+
+    // Order attachments (receipts, proof of delivery)
+    match /orders/{orderId}/attachments/{fileName} {
+      allow read: if isSignedIn() && 
+        (firestore.get(/databases/(default)/documents/orders/$(orderId)).data.userId == request.auth.uid ||
+         firestore.get(/databases/(default)/documents/orders/$(orderId)).data.driverId == request.auth.uid ||
+         isAdmin());
+      allow write: if isSignedIn() && 
+        (firestore.get(/databases/(default)/documents/orders/$(orderId)).data.driverId == request.auth.uid ||
+         firestore.get(/databases/(default)/documents/orders/$(orderId)).data.restaurantId in 
+           firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.ownedRestaurants) &&
+        request.resource.size < 10 * 1024 * 1024;
+    }
+
+    // Chat attachments
+    match /chats/{chatId}/attachments/{fileName} {
+      allow read: if isSignedIn() && 
+        (firestore.get(/databases/(default)/documents/chats/$(chatId)).data.userId == request.auth.uid ||
+         firestore.get(/databases/(default)/documents/chats/$(chatId)).data.assignedAgentId == request.auth.uid ||
+         isAdmin());
+      allow write: if isSignedIn() && 
+        (firestore.get(/databases/(default)/documents/chats/$(chatId)).data.userId == request.auth.uid ||
+         firestore.get(/databases/(default)/documents/chats/$(chatId)).data.assignedAgentId == request.auth.uid) &&
+        request.resource.size < 10 * 1024 * 1024;
+    }
+
+    // Category images
+    match /categories/{categoryId}/{fileName} {
+      allow read: if true;
+      allow write: if isAdmin() && 
+        request.resource.size < 5 * 1024 * 1024 &&
+        request.resource.contentType.matches('image/.*');
+    }
+
+    // Banner/promotional images
+    match /banners/{bannerId}/{fileName} {
+      allow read: if true;
+      allow write: if isAdmin() && 
+        request.resource.size < 10 * 1024 * 1024 &&
+        request.resource.contentType.matches('image/.*');
+    }
+
+    // Default deny all other paths
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}
