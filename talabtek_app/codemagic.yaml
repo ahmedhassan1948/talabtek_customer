@@ -9,6 +9,7 @@
       cache_paths:
         - ~/.pub-cache
         - $HOME/.gradle/caches
+        working_directory: talabtek_app
     scripts:
       - name: Get dependencies
         script: flutter pub get
