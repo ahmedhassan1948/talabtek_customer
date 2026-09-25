@@ -27,6 +27,7 @@ jobs:
           flutter-version: '3.19.0'
           channel: 'stable'
           cache: true
+          working-directory: talabtek_app
       
       - name: Setup Java
         uses: actions/setup-java@v5
