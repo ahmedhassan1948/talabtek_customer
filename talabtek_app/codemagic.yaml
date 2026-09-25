@@ -2,7 +2,6 @@ workflows:
   android-build:
     name: Android App Bundle
     max_build_duration: 30
-    working_directory: talabtek_app
     environment:
       flutter: "3.19.0"
       java: "17"
@@ -12,9 +11,6 @@ workflows:
         - $HOME/.gradle/caches
     scripts:
       - name: Get dependencies
-        flutter:
-        sdk: flutter
-        intl: ^0.19.0
         script: flutter pub get
       - name: Build App Bundle
         script: flutter build appbundle --release --obfuscate --split-debug-info=build/app/outputs/symbols
@@ -24,4 +20,4 @@ workflows:
     publishing:
       email:
         recipients:
-          - ahmedhassan19481@gmail.com
+          - your-email@example.com
