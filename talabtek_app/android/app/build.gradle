@@ -1,27 +1,29 @@
-def localProperties = new Properties()
-def localPropertiesFile = rootProject.file('local.properties')
-if (localPropertiesFile.exists()) {
-    localProperties.load(new FileInputStream(localPropertiesFile))
-}
+buildscript {
+    def localProperties = new Properties()
+    def localPropertiesFile = rootProject.file('local.properties')
+    if (localPropertiesFile.exists()) {
+        localProperties.load(new FileInputStream(localPropertiesFile))
+    }
 
-def flutterRoot = localProperties.getProperty('flutter.sdk')
-if (flutterRoot == null) {
-    throw new GradleException("Flutter SDK not found. Define location with flutter.sdk in the local.properties file.")
-}
+    def flutterRoot = localProperties.getProperty('flutter.sdk')
+    if (flutterRoot == null) {
+        throw new GradleException("Flutter SDK not found. Define location with flutter.sdk in the local.properties file.")
+    }
 
-def flutterVersionCode = localProperties.getProperty('flutter.versionCode') ?: '1'
-def flutterVersionName = localProperties.getProperty('flutter.versionName') ?: '1.0.0'
+    def flutterVersionCode = localProperties.getProperty('flutter.versionCode') ?: '1'
+    def flutterVersionName = localProperties.getProperty('flutter.versionName') ?: '1.0.0'
 
-def keystorePropertiesFile = rootProject.file("key.properties")
-def keystoreProperties = new Properties()
-if (keystorePropertiesFile.exists()) {
-    keystoreProperties.load(new FileInputStream(keystorePropertiesFile))
-} else {
-    println "WARNING: key.properties file not found at $keystorePropertiesFile"
-    keystoreProperties['keyAlias'] = 'upload'
-    keystoreProperties['keyPassword'] = 'talabtek123'
-    keystoreProperties['storeFile'] = 'upload-keystore.jks'
-    keystoreProperties['storePassword'] = 'talabtek123'
+    def keystorePropertiesFile = rootProject.file("key.properties")
+    def keystoreProperties = new Properties()
+    if (keystorePropertiesFile.exists()) {
+        keystoreProperties.load(new FileInputStream(keystorePropertiesFile))
+    } else {
+        println "WARNING: key.properties file not found at $keystorePropertiesFile"
+        ext.keyAlias = 'upload'
+        ext.keyPassword = 'talabtek123'
+        ext.storeFile = 'upload-keystore.jks'
+        ext.storePassword = 'talabtek123'
+    }
 }
 
 plugins {
@@ -43,6 +45,47 @@ android {
 
     kotlinOptions {
         jvmTarget = '1.8'
+    }
+
+    def localProperties = new Properties()
+    def localPropertiesFile = rootProject.file('local.properties')
+    if (localPropertiesFile.exists()) {
+        localProperties.load(new FileInputStream(localPropertiesFile))
+    }
+
+    def flutterRoot = localProperties.getProperty('flutter.sdk')
+    if (flutterRoot == null) {
+        throw new GradleException("Flutter SDK not found. Define location with flutter.sdk in the local.properties file.")
+    }
+
+    def flutterVersionCode = localProperties.getProperty('flutter.versionCode') ?: '1'
+    def flutterVersionName = localProperties.getProperty('flutter.versionName') ?: '1.0.0'
+
+    def keystorePropertiesFile = rootProject.file("key.properties")
+    def keystoreProperties = new Properties()
+    if (keystorePropertiesFile.exists()) {
+        keystoreProperties.load(new FileInputStream(keystorePropertiesFile))
+    } else {
+        println "WARNING: key.properties file not found at $keystorePropertiesFile"
+        ext.keyAlias = 'upload'
+        ext.keyPassword = 'talabtek123'
+        ext.storeFile = 'upload-keystore.jks'
+        ext.storePassword = 'talabtek123'
+    }
+
+    def flutterVersionCode = localProperties.getProperty('flutter.versionCode') ?: '1'
+    def flutterVersionName = localProperties.getProperty('flutter.versionName') ?: '1.0.0'
+
+    def keystorePropertiesFile = rootProject.file("key.properties")
+    def keystoreProperties = new Properties()
+    if (keystorePropertiesFile.exists()) {
+        keystoreProperties.load(new FileInputStream(keystorePropertiesFile))
+    } else {
+        println "WARNING: key.properties file not found at $keystorePropertiesFile"
+        ext.keyAlias = 'upload'
+        ext.keyPassword = 'talabtek123'
+        ext.storeFile = 'upload-keystore.jks'
+        ext.storePassword = 'talabtek123'
     }
 
     defaultConfig {
