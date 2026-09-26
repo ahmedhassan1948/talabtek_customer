@@ -2,92 +2,45 @@ name: Build Android App Bundle
 
 on:
   push:
-    branches: [main, develop]
+    branches: [ "main" ] # أو master حسب اسم الفرع لديك
   pull_request:
-    branches: [main]
-  release:
-    types: [published]
+    branches: [ "main" ]
 
 jobs:
   build:
-    name: Build Android AAB
     runs-on: ubuntu-latest
-    timeout-minutes: 30
-    
+
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v5
-      
-      - name: Setup Flutter
+      # 1. جلب الكود من المستودع
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # 2. إعداد بيئة جافا (مطلوبة لبناء أندرويد)
+      - name: Set up Java JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'zulu'
+          java-version: '17'
+
+      # 3. إعداد بيئة فلاتر (تم إزالة working-directory من هنا لحل المشكلة)
+      - name: Set up Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.19.0'
+          flutter-version: '3.x' # أو يمكنك تحديد الإصدار بالضبط مثل '3.19.0'
           channel: 'stable'
           cache: true
-      
-      - name: Setup Java
-        uses: actions/setup-java@v5
-        with:
-          distribution: 'temurin'
-          java-version: '17'
-          cache: 'gradle'
-      
+
+      # 4. تثبيت الحزم والمكتبات
       - name: Install dependencies
         run: flutter pub get
-        working-directory: ./talabtek_app
-      
-      - name: Decode Keystore
-        if: env.KEYSTORE_BASE64 != ''
-        run: |
-          echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > android/upload-keystore.jks
-        working-directory: ./talabtek_app
-      
-      - name: Create key.properties
-        if: env.KEYSTORE_PASSWORD != ''
-        run: |
-          cat > android/key.properties << EOF
-          storePassword=${{ secrets.KEYSTORE_PASSWORD }}
-          keyPassword=${{ secrets.KEY_PASSWORD }}
-          keyAlias=${{ secrets.KEY_ALIAS }}
-          storeFile=upload-keystore.jks
-          EOF
-        working-directory: ./talabtek_app
-      
-      - name: Build App Bundle
-        run: flutter build appbundle --release --obfuscate --split-debug-info=build/app/outputs/symbols
-        working-directory: ./talabtek_app
-      
-      - name: Upload AAB Artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: app-release.aab
-          path: talabtek_app/build/app/outputs/bundle/release/app-release.aab
-          retention-days: 30
-      
-      - name: Upload Symbol Files
-        uses: actions/upload-artifact@v4
-        with:
-          name: symbols
-          path: talabtek_app/build/app/outputs/symbols
-          retention-days: 30
 
-  deploy-playstore:
-    name: Deploy to Play Store
-    needs: build
-    if: github.event_name == 'release' && github.event.action == 'published'
-    runs-on: ubuntu-latest
-    steps:
-      - name: Download AAB
-        uses: actions/download-artifact@v4
+      # 5. بناء ملف الـ App Bundle (.aab)
+      - name: Build Android App Bundle
+        run: flutter build appbundle --release
+
+      # 6. حفظ الملف الناتج للتحميل لاحقاً
+      - name: Upload App Bundle Artifact
+        uses: actions/upload-artifact@v4
         with:
-          name: app-release.aab
-          path: ./aab
-      
-      - name: Deploy to Play Store
-        uses: r0adkll/upload-google-play@v1
-        with:
-          serviceAccountJsonPlainText: ${{ secrets.PLAY_STORE_JSON }}
-          packageName: com.talabtek.customer
-          releaseFiles: ./aab/app-release.aab
-          track: internal
-          status: draft
+          name: app-release-aab
+          path: build/app/outputs/bundle/release/app-release.aab
