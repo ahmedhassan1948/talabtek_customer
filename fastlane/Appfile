@@ -1,0 +1,9 @@
+# frozen_string_literal: true
+
+app_identifier "com.talabtek.customer"
+apple_id "your-apple-id@example.com"
+team_id "YOUR_TEAM_ID"
+
+# For Android
+package_name "com.talabtek.customer"
+json_key_file "./fastlane/google-play-service-account.json"
