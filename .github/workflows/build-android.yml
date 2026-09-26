@@ -2,7 +2,7 @@ name: Build Android App Bundle
 
 on:
   push:
-    branches: [ "main" ] # أو master حسب اسم الفرع لديك
+    branches: [ "main" ]
   pull_request:
     branches: [ "main" ]
 
@@ -10,37 +10,42 @@ jobs:
   build:
     runs-on: ubuntu-latest
 
+    # تعيين المجلد الافتراضي لجميع أوامر البناء
+    defaults:
+      run:
+        working-directory: ./my_app # 👈 غير هذا إلى اسم المجلد الفرعي لديك
+
     steps:
       # 1. جلب الكود من المستودع
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # 2. إعداد بيئة جافا (مطلوبة لبناء أندرويد)
+      # 2. إعداد بيئة جافا
       - name: Set up Java JDK
         uses: actions/setup-java@v4
         with:
           distribution: 'zulu'
           java-version: '17'
 
-      # 3. إعداد بيئة فلاتر (تم إزالة working-directory من هنا لحل المشكلة)
+      # 3. إعداد بيئة فلاتر (بدون working-directory تحت with)
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.x' # أو يمكنك تحديد الإصدار بالضبط مثل '3.19.0'
+          flutter-version: '3.x'
           channel: 'stable'
           cache: true
 
-      # 4. تثبيت الحزم والمكتبات
+      # 4. تثبيت الحزم
       - name: Install dependencies
         run: flutter pub get
 
-      # 5. بناء ملف الـ App Bundle (.aab)
+      # 5. بناء ملف الـ App Bundle
       - name: Build Android App Bundle
         run: flutter build appbundle --release
 
-      # 6. حفظ الملف الناتج للتحميل لاحقاً
+      # 6. حفظ الملف الناتج للتحميل
       - name: Upload App Bundle Artifact
         uses: actions/upload-artifact@v4
         with:
           name: app-release-aab
-          path: build/app/outputs/bundle/release/app-release.aab
+          path: my_app/build/app/outputs/bundle/release/app-release.aab # 👈 ضع اسم المجلد الفرعي في البداية
