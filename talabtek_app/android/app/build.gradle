@@ -40,7 +40,7 @@ android {
     }
 
     defaultConfig {
-        applicationId "com.talabtek.customer"
+        applicationId "com.talabtk.order"
         minSdkVersion 21
         targetSdkVersion 35
         versionCode flutterVersionCode.toInteger()
