@@ -1,3 +1,15 @@
+android {
+    namespace = "com.talabtk.order"
+    compileSdk = 36 // تحديث مستوى التجميع إلى 36
+
+    defaultConfig {
+        applicationId = "com.talabtk.order"
+        minSdk = flutter.minSdkVersion
+        targetSdk = 36 // تحديث التارقت إلى 36 مباشرة
+        versionCode = flutter.versionCode
+        versionName = flutter.versionName
+    }
+}
 allprojects {
     repositories {
         google()
