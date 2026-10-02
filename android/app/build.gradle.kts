@@ -6,6 +6,7 @@ plugins {
 
 android {
     namespace = "com.talabtk.order"
+    compileSdk = 36 
     compileSdk = flutter.compileSdkVersion 36
     ndkVersion = flutter.ndkVersion
 
