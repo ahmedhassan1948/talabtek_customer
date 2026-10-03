@@ -1,64 +1,40 @@
-name: Build Android App Bundle
+name: Build Android AAB
 
 on:
-  push:
-    branches: [main]
   workflow_dispatch:
 
 jobs:
   build:
-    name: Build Android App Bundle
     runs-on: ubuntu-latest
-    timeout-minutes: 40
-    defaults:
-      run:
-        working-directory: talabtek_app
 
     steps:
-      - name: Checkout code
+      - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup Java
+      - name: Set up Java
         uses: actions/setup-java@v4
         with:
-          distribution: 'temurin'
+          distribution: temurin
           java-version: '17'
 
-      - name: Setup Flutter
+      - name: Set up Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.29.3'
-          channel: 'stable'
+          flutter-version: '3.47.1'
+          channel: stable
           cache: true
 
-      # ملف Firebase من الـ Secrets (GOOGLE_SERVICES_JSON)
-      - name: Create google-services.json
-        env:
-          GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
-        run: |
-          if [ -z "$GOOGLE_SERVICES_JSON" ]; then echo "::error::أضف السر GOOGLE_SERVICES_JSON في Settings > Secrets > Actions"; exit 1; fi
-          echo "$GOOGLE_SERVICES_JSON" > android/app/google-services.json
-
-      # مفتاح التوقيع من الـ Secrets (اختياري؛ بدونه يُوقَّع بمفتاح debug)
-      - name: Decode keystore
-        env:
-          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
-        run: |
-          if [ -n "$KEYSTORE_BASE64" ]; then echo "$KEYSTORE_BASE64" | base64 -d > android/upload-keystore.jks; echo "KEYSTORE_FILE=upload-keystore.jks" >> $GITHUB_ENV; fi
+      - name: Flutter Doctor
+        run: flutter doctor -v
 
       - name: Get dependencies
         run: flutter pub get
 
-      - name: Build App Bundle
-        env:
-          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
-          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
-          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
-        run: flutter build appbundle --release --obfuscate --split-debug-info=build/app/outputs/symbols
+      - name: Build Android App Bundle
+        run: flutter build appbundle --release
 
-      - name: Upload App Bundle
+      - name: Upload AAB
         uses: actions/upload-artifact@v4
         with:
-          name: app-release-aab
-          path: talabtek_app/build/app/outputs/bundle/release/app-release.aab
-          retention-days: 30
+          name: talabtek-customer-aab
+          path: build/app/outputs/bundle/release/app-release.aab
