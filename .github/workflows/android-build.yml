@@ -7,6 +7,10 @@ jobs:
   build:
     runs-on: ubuntu-24.04
 
+    defaults:
+      run:
+        working-directory: talabtek_app
+
     steps:
       - name: Checkout
         uses: actions/checkout@v5
@@ -27,16 +31,20 @@ jobs:
       - name: Flutter Doctor
         run: flutter doctor -v
 
+      - name: Check Flutter project
+        run: |
+          pwd
+          ls -la
+          test -f pubspec.yaml
+          echo "pubspec.yaml found successfully"
+
       - name: Get dependencies
         run: flutter pub get
 
       - name: Verify Android SDK settings
         run: |
-          echo "===== build.gradle.kts ====="
-          cat android/app/build.gradle.kts
-          echo "===== Searching targetSdk ====="
+          echo "===== Android SDK settings ====="
           grep -Rni "targetSdk" android
-          echo "===== Searching compileSdk ====="
           grep -Rni "compileSdk" android
 
       - name: Build Android App Bundle
@@ -46,4 +54,4 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: talabtek-customer-aab
-          path: build/app/outputs/bundle/release/app-release.aab
+          path: talabtek_app/build/app/outputs/bundle/release/app-release.aab
