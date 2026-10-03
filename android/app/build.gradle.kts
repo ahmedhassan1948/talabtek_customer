@@ -17,7 +17,7 @@ android {
     defaultConfig {
         applicationId = "com.talabtk.order"
         
-        minSdk = 21
+        minSdk = 23
         targetSdk = 36
         
         versionCode = flutter.versionCode
