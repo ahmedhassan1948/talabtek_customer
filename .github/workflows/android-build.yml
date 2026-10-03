@@ -43,8 +43,10 @@ jobs:
 
       - name: Verify Android SDK settings
         run: |
-          echo "===== Android SDK settings ====="
+          echo "===== targetSdk ====="
           grep -Rni "targetSdk" android
+
+          echo "===== compileSdk ====="
           grep -Rni "compileSdk" android
 
       - name: Build Android App Bundle
