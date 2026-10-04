@@ -1,52 +1,64 @@
-Run flutter build appbundle --release --obfuscate --split-debug-info=build/app/outputs/symbols
-  flutter build appbundle --release --obfuscate --split-debug-info=build/app/outputs/symbols
-  shell: /usr/bin/bash -e ***0***
-  env:
-    JAVA_HOME: /opt/hostedtoolcache/Java_Temurin-Hotspot_jdk/17.0.20-1/x64
-    JAVA_HOME_17_X64: /opt/hostedtoolcache/Java_Temurin-Hotspot_jdk/17.0.20-1/x64
-    FLUTTER_ROOT: /opt/hostedtoolcache/flutter/stable-3.29.3-x64/flutter
-    PUB_CACHE: /home/runner/.pub-cache
-    KEYSTORE_FILE: ***-keystore.jks
-    KEYSTORE_PASSWORD: ***
-    KEY_ALIAS: ***
-    KEY_PASSWORD: ***
+name: Build Android App Bundle
 
-Running Gradle task 'bundleRelease'...                          
-Checking the license for package NDK (Side by side) 27.0.12077973 in /usr/local/lib/android/sdk/licenses
-License for package NDK (Side by side) 27.0.12077973 accepted.
-Preparing "Install NDK (Side by side) 27.0.12077973 v.27.0.12077973".
-"Install NDK (Side by side) 27.0.12077973 v.27.0.12077973" ready.
-Installing NDK (Side by side) 27.0.12077973 in /usr/local/lib/android/sdk/ndk/27.0.12077973
-"Install NDK (Side by side) 27.0.12077973 v.27.0.12077973" complete.
-"Install NDK (Side by side) 27.0.12077973 v.27.0.12077973" finished.
-Checking the license for package Android SDK Platform 33 in /usr/local/lib/android/sdk/licenses
-License for package Android SDK Platform 33 accepted.
-Preparing "Install Android SDK Platform 33 (revision 3)".
-"Install Android SDK Platform 33 (revision 3)" ready.
-Installing Android SDK Platform 33 in /usr/local/lib/android/sdk/platforms/android-33
-"Install Android SDK Platform 33 (revision 3)" complete.
-"Install Android SDK Platform 33 (revision 3)" finished.
-Note: Some input files use or override a deprecated API.
-Note: Recompile with -Xlint:deprecation for details.
-Note: Some input files use or override a deprecated API.
-Note: Recompile with -Xlint:deprecation for details.
-Note: /home/runner/.pub-cache/hosted/pub.dev/firebase_messaging-14.7.10/android/src/main/java/io/flutter/plugins/firebase/messaging/FlutterFirebaseMessagingPlugin.java uses unchecked or unsafe operations.
-Note: Recompile with -Xlint:unchecked for details.
-Font asset "MaterialIcons-Regular.otf" was tree-shaken, reducing it from 1645184 to 1096 bytes (99.9% reduction). Tree-shaking can be disabled by providing the --no-tree-shake-icons flag when building your app.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
 
-FAILURE: Build failed with an exception.
+jobs:
+  build:
+    name: Build Android App Bundle
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    defaults:
+      run:
+        working-directory: talabtek_app
 
-* What went wrong:
-Execution failed for task ':app:processReleaseGoogleServices'.
-> No matching client found for package name 'com.talabtk.order' in /home/runner/work/talabtek_customer/talabtek_customer/talabtek_app/android/app/google-services.json
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-* Try:
-> Run with --stacktrace option to get the stack trace.
-> Run with --info or --debug option to get more log output.
-> Run with --scan to get full insights.
-> Get more help at https://help.gradle.org.
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
 
-BUILD FAILED in 3m 56s
-Running Gradle task 'bundleRelease'...                            236.9s
-Gradle task bundleRelease failed with exit code 1
-Error: Process completed with exit code 1.
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.29.3'
+          channel: 'stable'
+          cache: true
+
+      # ملف Firebase من الـ Secrets (GOOGLE_SERVICES_JSON)
+      - name: Create google-services.json
+        env:
+          GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
+        run: |
+          if [ -z "$GOOGLE_SERVICES_JSON" ]; then echo "::error::أضف السر GOOGLE_SERVICES_JSON في Settings > Secrets > Actions"; exit 1; fi
+          echo "$GOOGLE_SERVICES_JSON" > android/app/google-services.json
+
+      # مفتاح التوقيع من الـ Secrets (اختياري؛ بدونه يُوقَّع بمفتاح debug)
+      - name: Decode keystore
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+        run: |
+          if [ -n "$KEYSTORE_BASE64" ]; then echo "$KEYSTORE_BASE64" | base64 -d > android/upload-keystore.jks; echo "KEYSTORE_FILE=upload-keystore.jks" >> $GITHUB_ENV; fi
+
+      - name: Get dependencies
+        run: flutter pub get
+
+      - name: Build App Bundle
+        env:
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        run: flutter build appbundle --release --obfuscate --split-debug-info=build/app/outputs/symbols
+
+      - name: Upload App Bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-release-aab
+          path: talabtek_app/build/app/outputs/bundle/release/app-release.aab
+          retention-days: 30
