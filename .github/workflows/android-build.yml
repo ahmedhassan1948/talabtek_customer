@@ -1,59 +1,52 @@
-name: Build Android AAB
+Run flutter build appbundle --release --obfuscate --split-debug-info=build/app/outputs/symbols
+  flutter build appbundle --release --obfuscate --split-debug-info=build/app/outputs/symbols
+  shell: /usr/bin/bash -e ***0***
+  env:
+    JAVA_HOME: /opt/hostedtoolcache/Java_Temurin-Hotspot_jdk/17.0.20-1/x64
+    JAVA_HOME_17_X64: /opt/hostedtoolcache/Java_Temurin-Hotspot_jdk/17.0.20-1/x64
+    FLUTTER_ROOT: /opt/hostedtoolcache/flutter/stable-3.29.3-x64/flutter
+    PUB_CACHE: /home/runner/.pub-cache
+    KEYSTORE_FILE: ***-keystore.jks
+    KEYSTORE_PASSWORD: ***
+    KEY_ALIAS: ***
+    KEY_PASSWORD: ***
 
-on:
-  workflow_dispatch:
+Running Gradle task 'bundleRelease'...                          
+Checking the license for package NDK (Side by side) 27.0.12077973 in /usr/local/lib/android/sdk/licenses
+License for package NDK (Side by side) 27.0.12077973 accepted.
+Preparing "Install NDK (Side by side) 27.0.12077973 v.27.0.12077973".
+"Install NDK (Side by side) 27.0.12077973 v.27.0.12077973" ready.
+Installing NDK (Side by side) 27.0.12077973 in /usr/local/lib/android/sdk/ndk/27.0.12077973
+"Install NDK (Side by side) 27.0.12077973 v.27.0.12077973" complete.
+"Install NDK (Side by side) 27.0.12077973 v.27.0.12077973" finished.
+Checking the license for package Android SDK Platform 33 in /usr/local/lib/android/sdk/licenses
+License for package Android SDK Platform 33 accepted.
+Preparing "Install Android SDK Platform 33 (revision 3)".
+"Install Android SDK Platform 33 (revision 3)" ready.
+Installing Android SDK Platform 33 in /usr/local/lib/android/sdk/platforms/android-33
+"Install Android SDK Platform 33 (revision 3)" complete.
+"Install Android SDK Platform 33 (revision 3)" finished.
+Note: Some input files use or override a deprecated API.
+Note: Recompile with -Xlint:deprecation for details.
+Note: Some input files use or override a deprecated API.
+Note: Recompile with -Xlint:deprecation for details.
+Note: /home/runner/.pub-cache/hosted/pub.dev/firebase_messaging-14.7.10/android/src/main/java/io/flutter/plugins/firebase/messaging/FlutterFirebaseMessagingPlugin.java uses unchecked or unsafe operations.
+Note: Recompile with -Xlint:unchecked for details.
+Font asset "MaterialIcons-Regular.otf" was tree-shaken, reducing it from 1645184 to 1096 bytes (99.9% reduction). Tree-shaking can be disabled by providing the --no-tree-shake-icons flag when building your app.
 
-jobs:
-  build:
-    runs-on: ubuntu-24.04
+FAILURE: Build failed with an exception.
 
-    defaults:
-      run:
-        working-directory: talabtek_app
+* What went wrong:
+Execution failed for task ':app:processReleaseGoogleServices'.
+> No matching client found for package name 'com.talabtk.order' in /home/runner/work/talabtek_customer/talabtek_customer/talabtek_app/android/app/google-services.json
 
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v5
+* Try:
+> Run with --stacktrace option to get the stack trace.
+> Run with --info or --debug option to get more log output.
+> Run with --scan to get full insights.
+> Get more help at https://help.gradle.org.
 
-      - name: Set up Java
-        uses: actions/setup-java@v5
-        with:
-          distribution: temurin
-          java-version: '17'
-
-      - name: Set up Flutter
-        uses: subosito/flutter-action@v2
-        with:
-          flutter-version: '3.47.1'
-          channel: stable
-          cache: true
-
-      - name: Flutter Doctor
-        run: flutter doctor -v
-
-      - name: Check Flutter project
-        run: |
-          pwd
-          ls -la
-          test -f pubspec.yaml
-          echo "pubspec.yaml found successfully"
-
-      - name: Get dependencies
-        run: flutter pub get
-
-      - name: Verify Android SDK settings
-        run: |
-          echo "===== targetSdk ====="
-          grep -Rni "targetSdk" android
-
-          echo "===== compileSdk ====="
-          grep -Rni "compileSdk" android
-
-      - name: Build Android App Bundle
-        run: flutter build appbundle --release
-
-      - name: Upload AAB
-        uses: actions/upload-artifact@v4
-        with:
-          name: talabtek-customer-aab
-          path: talabtek_app/build/app/outputs/bundle/release/app-release.aab
+BUILD FAILED in 3m 56s
+Running Gradle task 'bundleRelease'...                            236.9s
+Gradle task bundleRelease failed with exit code 1
+Error: Process completed with exit code 1.
