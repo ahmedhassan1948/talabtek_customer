@@ -24,7 +24,7 @@ def ksFile = keystoreProperties['storeFile'] ?: System.getenv('KEYSTORE_FILE')
 
 android {
     namespace "com.talabtek.customer"
-    compileSdk 35
+    compileSdk 36
 
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_17
@@ -42,7 +42,7 @@ android {
     defaultConfig {
         applicationId "com.talabtk.order"
         minSdkVersion 21
-        targetSdkVersion 35
+        targetSdkVersion 36
         versionCode flutterVersionCode.toInteger()
         versionName flutterVersionName
         multiDexEnabled true
