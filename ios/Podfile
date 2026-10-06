@@ -72,12 +72,19 @@ post_install do |installer|
     end
   end
 
-  # Workaround: gRPC-C++ basic_seq.h fails to parse with newer Xcode/Clang
-  header = File.join(installer.sandbox.root, 'gRPC-C++/src/core/lib/promise/detail/basic_seq.h')
-  if File.exist?(header)
-    File.chmod(0644, header)
-    text = File.read(header)
-    patched = text.gsub('Traits::template CallSeqFactory', 'Traits::CallSeqFactory')
-    File.write(header, patched) if text != patched
+  # Workaround: gRPC-C++ "template" keyword issue with newer Clang
+  grpc_dir = File.join(installer.sandbox.root, 'gRPC-C++')
+  patched_count = 0
+  Dir.glob(File.join(grpc_dir, 'src/core/**/*.{h,cc}')).each do |file|
+    text = File.read(file)
+    # Remove "template" when it is not followed by a template argument list "<"
+    patched = text.gsub(/::template\s+(\w+)(?!\s*<|\w)/, '::\1')
+    if patched != text
+      File.chmod(0644, file)
+      File.write(file, patched)
+      patched_count += 1
+      puts "[grpc-patch] patched #{file}"
+    end
   end
+  puts "[grpc-patch] files patched: #{patched_count}"
 end
