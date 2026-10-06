@@ -17,11 +17,18 @@ jobs:
         with:
           channel: stable
           cache: true
-          cache-dependency-path: ${{ env.APP_DIR }}/pubspec.lock
+
+      - name: Generate iOS platform if missing
+        working-directory: ${{ env.APP_DIR }}
+        run: |
+          if [ ! -d ios ]; then
+            flutter create --platforms=ios .
+          fi
 
       - name: Firebase config
         working-directory: ${{ env.APP_DIR }}
         run: |
+          mkdir -p ios/Runner
           echo -n "${{ secrets.GOOGLE_SERVICE_INFO_PLIST_BASE64 }}" | base64 --decode > ios/Runner/GoogleService-Info.plist
 
       - name: Install certificate and profile
@@ -44,6 +51,14 @@ jobs:
 
           mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
           cp $RUNNER_TEMP/profile.mobileprovision ~/Library/MobileDevice/Provisioning\ Profiles/
+
+      - name: Configure Xcode signing
+        working-directory: ${{ env.APP_DIR }}
+        run: |
+          PBX=ios/Runner.xcodeproj/project.pbxproj
+          sed -i '' "/RunnerTests/!s/PRODUCT_BUNDLE_IDENTIFIER = .*;/PRODUCT_BUNDLE_IDENTIFIER = ${BUNDLE_ID};/" $PBX
+          sed -i '' "s/CODE_SIGN_STYLE = Automatic;/CODE_SIGN_STYLE = Manual; DEVELOPMENT_TEAM = ${{ secrets.APPLE_TEAM_ID }}; PROVISIONING_PROFILE_SPECIFIER = \"${PROFILE_NAME}\"; CODE_SIGN_IDENTITY = \"Apple Distribution\";/" $PBX
+          grep -n "CODE_SIGN_STYLE\|PRODUCT_BUNDLE_IDENTIFIER" $PBX
 
       - name: Create ExportOptions.plist
         run: |
@@ -68,7 +83,7 @@ jobs:
         run: |
           flutter pub get
           flutter build ipa --release \
-            --build-number=${{ github.run_number }} \
+            --build-number=$((${{ github.run_number }} + 100)) \
             --export-options-plist=$RUNNER_TEMP/ExportOptions.plist
 
       - name: Upload to App Store Connect
