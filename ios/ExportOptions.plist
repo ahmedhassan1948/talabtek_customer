@@ -10,7 +10,7 @@
   <string>manual</string>
   <key>provisioningProfiles</key>
   <dict>
-    <key>com.talabtek.customer</key>
+    <key>com.talabtk.order</key>
     <string>talabtk-appstore</string>
   </dict>
 </dict>
