@@ -1,3 +1,4 @@
+
 name: iOS TestFlight
 
 on:
@@ -38,7 +39,7 @@ jobs:
         env:
           GOOGLE_PLIST_BASE64: ${{ secrets.GOOGLE_SERVICE_INFO_PLIST_BASE64 }}
           TEAM_ID: X86FLFKF4K
-          BUNDLE_ID: com.talabtek.customer
+          BUNDLE_ID: com.talabtk.order
           PROFILE_NAME: talabtk-appstore
         run: |
           if [ ! -d ios/Runner.xcodeproj ]; then
