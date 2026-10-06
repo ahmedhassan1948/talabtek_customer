@@ -77,8 +77,8 @@ post_install do |installer|
   patched_count = 0
   Dir.glob(File.join(grpc_dir, 'src/core/**/*.{h,cc}')).each do |file|
     text = File.read(file)
-    # Remove "template" when it is not followed by a template argument list "<"
-    patched = text.gsub(/::template\s+(\w+)(?!\s*<|\w)/, '::\1')
+    # Remove "template" (after ::, . or ->) when not followed by "<"
+    patched = text.gsub(/(::|\.|->)template\s+(\w+)(?!\s*<|\w)/, '\1\2')
     if patched != text
       File.chmod(0644, file)
       File.write(file, patched)
