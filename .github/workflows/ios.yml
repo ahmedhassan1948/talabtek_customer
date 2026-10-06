@@ -1,153 +1,53 @@
-name: iOS TestFlight
+name: iOS Release
 
 on:
   workflow_dispatch:
+  push:
+    branches: [main]
+
+env:
+  APP_DIR: ./talabtek_app
 
 jobs:
   build-ios:
     runs-on: macos-latest
+
     steps:
       - uses: actions/checkout@v4
-
-      - name: Find Flutter project folder
-        run: |
-          PUBSPEC=$(find . -maxdepth 4 -name pubspec.yaml -not -path "*/.*" -not -path "*/node_modules/*" | head -1)
-          if [ -z "$PUBSPEC" ]; then
-            echo "pubspec.yaml not found. Repo contents:"
-            ls -la
-            find . -maxdepth 2 -not -path "./.git/*" | head -50
-            exit 1
-          fi
-          APP_DIR=$(dirname "$PUBSPEC")
-          echo "Flutter project folder: $APP_DIR"
-          echo "APP_DIR=$APP_DIR" >> $GITHUB_ENV
-          # لو ExportOptions.plist موجود في ios/ بالمجلد الرئيسي، انسخه لمجلد المشروع
-          if [ ! -f "$APP_DIR/ios/ExportOptions.plist" ] && [ -f ios/ExportOptions.plist ]; then
-            mkdir -p "$APP_DIR/ios"
-            cp ios/ExportOptions.plist "$APP_DIR/ios/ExportOptions.plist"
-          fi
-          ls "$APP_DIR/ios" || true
 
       - uses: subosito/flutter-action@v2
         with:
           channel: stable
           cache: true
 
-      - name: Create and configure iOS project
-        working-directory: ${{ env.APP_DIR }}
-        env:
-          GOOGLE_PLIST_BASE64: ${{ secrets.GOOGLE_SERVICE_INFO_PLIST_BASE64 }}
-          TEAM_ID: X86FLFKF4K
-          BUNDLE_ID: com.talabtk.order
-          PROFILE_NAME: talabtk-appstore
+      # ===== ضع هنا خطوات الشهادات والـ provisioning profile الموجودة عندك =====
+      # (استيراد الشهادة، تثبيت البروفايل، ... إلخ) بدون أي تغيير
+      # ===========================================================================
+
+      - name: Select Xcode 16
         run: |
-          if [ ! -d ios/Runner.xcodeproj ]; then
-            echo "iOS project missing, creating it..."
-            flutter create --platforms=ios --project-name talabtek_app .
-          fi
-          if [ -n "$GOOGLE_PLIST_BASE64" ]; then
-            echo -n "$GOOGLE_PLIST_BASE64" | base64 --decode > ios/Runner/GoogleService-Info.plist
-          fi
-          python3 - << 'PY'
-          p = "ios/Podfile"
-          s = open(p).read()
-          if "BoringSSL-GRPC" not in s:
-              fix = r"""    if target.name == 'BoringSSL-GRPC'
-              target.source_build_phase.files.each do |file|
-                if file.settings && file.settings['COMPILER_FLAGS']
-                  flags = file.settings['COMPILER_FLAGS'].split
-                  flags.reject! { |flag| flag == '-GCC_WARN_INHIBIT_ALL_WARNINGS' }
-                  file.settings['COMPILER_FLAGS'] = flags.join(' ')
-                end
-              end
-            end
-          """
-              key = "flutter_additional_ios_build_settings(target)\n"
-              s = s.replace(key, key + fix, 1)
-              grpc = r"""  Dir.glob(File.join(installer.sandbox.root.to_s, 'gRPC-Core/src/core/lib/promise/**/*.h')).each do |f|
-              txt = File.read(f)
-              fixed = txt.gsub(/::template (\w+)\(/, '::template \1<>(')
-              if fixed != txt
-                File.chmod(0644, f)
-                File.write(f, fixed)
-              end
-            end
-          """
-              s = s.replace("  installer.pods_project.targets.each do |target|", grpc + "  installer.pods_project.targets.each do |target|", 1)
-              open(p, "w").write(s)
-              print("Podfile patched for BoringSSL-GRPC and gRPC-Core")
-          PY
-          sudo gem install xcodeproj --no-document
-          ruby -e '
-            require "xcodeproj"
-            proj = Xcodeproj::Project.open("ios/Runner.xcodeproj")
-            target = proj.targets.find { |t| t.name == "Runner" }
-            target.build_configurations.each do |c|
-              c.build_settings["PRODUCT_BUNDLE_IDENTIFIER"] = ENV["BUNDLE_ID"]
-              next unless c.name == "Release"
-              c.build_settings["CODE_SIGN_STYLE"] = "Manual"
-              c.build_settings["DEVELOPMENT_TEAM"] = ENV["TEAM_ID"]
-              c.build_settings["PROVISIONING_PROFILE_SPECIFIER"] = ENV["PROFILE_NAME"]
-              c.build_settings["CODE_SIGN_IDENTITY"] = "Apple Distribution"
-            end
-            plist = "ios/Runner/GoogleService-Info.plist"
-            if File.exist?(plist) && !target.resources_build_phase.files_references.any? { |f| f.path.to_s.end_with?("GoogleService-Info.plist") }
-              ref = proj.main_group["Runner"].new_file("GoogleService-Info.plist")
-              target.add_resources([ref])
-            end
-            proj.save
-          '
-          ls ios
+          ls /Applications | grep Xcode
+          sudo xcode-select -s /Applications/Xcode_16.4.app
+          xcodebuild -version
 
       - name: Flutter pub get
         working-directory: ${{ env.APP_DIR }}
         run: flutter pub get
 
-      - name: Install certificate and provisioning profile
-        env:
-          BUILD_CERTIFICATE_BASE64: ${{ secrets.IOS_CERT_P12_BASE64 }}
-          P12_PASSWORD: ${{ secrets.IOS_CERT_PASSWORD }}
-          BUILD_PROVISION_PROFILE_BASE64: ${{ secrets.IOS_PROVISION_PROFILE_BASE64 }}
-          KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
+      - name: Debug gRPC patch
+        working-directory: ${{ env.APP_DIR }}/ios
         run: |
-          CERTIFICATE_PATH=$RUNNER_TEMP/build_certificate.p12
-          PP_PATH=$RUNNER_TEMP/build_pp.mobileprovision
-          KEYCHAIN_PATH=$RUNNER_TEMP/app-signing.keychain-db
-
-          echo -n "$BUILD_CERTIFICATE_BASE64" | base64 --decode -o $CERTIFICATE_PATH
-          echo -n "$BUILD_PROVISION_PROFILE_BASE64" | base64 --decode -o $PP_PATH
-
-          security create-keychain -p "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
-          security set-keychain-settings -lut 21600 $KEYCHAIN_PATH
-          security unlock-keychain -p "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
-          security import $CERTIFICATE_PATH -P "$P12_PASSWORD" -A -t cert -f pkcs12 -k $KEYCHAIN_PATH
-          security set-key-partition-list -S apple-tool:,apple: -k "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
-          security list-keychain -d user -s $KEYCHAIN_PATH
-
-          mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
-          cp $PP_PATH ~/Library/MobileDevice/Provisioning\ Profiles/
+          pod install 2>&1 | grep "grpc-patch" || true
+          echo "---- remaining template lines ----"
+          grep -n "template" Pods/gRPC-C++/src/core/lib/promise/detail/basic_seq.h || true
+          echo "---- lines 98-106 ----"
+          sed -n '98,106p' Pods/gRPC-C++/src/core/lib/promise/detail/basic_seq.h
 
       - name: Build IPA
         working-directory: ${{ env.APP_DIR }}
         run: |
           flutter build ipa --release \
             --export-options-plist=ios/ExportOptions.plist \
-            --build-number=${{ github.run_number }}
+            --build-number=17
 
-      - uses: actions/upload-artifact@v4
-        with:
-          name: ios-ipa
-          path: ${{ env.APP_DIR }}/build/ios/ipa/*.ipa
-
-      - name: Upload to TestFlight
-        working-directory: ${{ env.APP_DIR }}
-        env:
-          KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
-          ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
-          API_KEY_BASE64: ${{ secrets.APP_STORE_CONNECT_KEY_BASE64 }}
-        run: |
-          mkdir -p ~/.appstoreconnect/private_keys
-          echo -n "$API_KEY_BASE64" | base64 --decode > ~/.appstoreconnect/private_keys/AuthKey_${KEY_ID}.p8
-          xcrun altool --upload-app --type ios \
-            --file build/ios/ipa/*.ipa \
-            --apiKey "$KEY_ID" --apiIssuer "$ISSUER_ID"
+      # ===== ضع هنا خطوة رفع الـ IPA (TestFlight / artifact) إن كانت موجودة =====
