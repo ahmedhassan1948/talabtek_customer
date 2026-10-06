@@ -52,7 +52,7 @@ jobs:
           p = "ios/Podfile"
           s = open(p).read()
           if "BoringSSL-GRPC" not in s:
-              fix = """    if target.name == 'BoringSSL-GRPC'
+              fix = r"""    if target.name == 'BoringSSL-GRPC'
               target.source_build_phase.files.each do |file|
                 if file.settings && file.settings['COMPILER_FLAGS']
                   flags = file.settings['COMPILER_FLAGS'].split
@@ -64,8 +64,18 @@ jobs:
           """
               key = "flutter_additional_ios_build_settings(target)\n"
               s = s.replace(key, key + fix, 1)
+              grpc = r"""  Dir.glob(File.join(installer.sandbox.root.to_s, 'gRPC-Core/src/core/lib/promise/**/*.h')).each do |f|
+              txt = File.read(f)
+              fixed = txt.gsub(/::template (\w+)\(/, '::template \1<>(')
+              if fixed != txt
+                File.chmod(0644, f)
+                File.write(f, fixed)
+              end
+            end
+          """
+              s = s.replace("  installer.pods_project.targets.each do |target|", grpc + "  installer.pods_project.targets.each do |target|", 1)
               open(p, "w").write(s)
-              print("Podfile patched for BoringSSL-GRPC")
+              print("Podfile patched for BoringSSL-GRPC and gRPC-Core")
           PY
           sudo gem install xcodeproj --no-document
           ruby -e '
