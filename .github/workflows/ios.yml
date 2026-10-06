@@ -24,7 +24,7 @@ jobs:
       # (استيراد الشهادة، تثبيت البروفايل، ... إلخ) بدون أي تغيير
       # ===========================================================================
 
-      - name: Select Xcode 16
+      - name: Select Xcode 26
         run: |
           ls /Applications | grep Xcode
           sudo xcode-select -s /Applications/Xcode_16.4.app
