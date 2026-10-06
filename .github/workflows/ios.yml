@@ -23,25 +23,22 @@ jobs:
       # ===== ضع هنا خطوات الشهادات والـ provisioning profile الموجودة عندك =====
       # (استيراد الشهادة، تثبيت البروفايل، ... إلخ) بدون أي تغيير
       # ===========================================================================
-
       - name: Select Xcode 26
         run: |
-          ls /Applications | grep Xcode
-          sudo xcode-select -s /Applications/Xcode_16.4.app
+          sudo xcode-select -s /Applications/Xcode_26.0.1.app
           xcodebuild -version
 
-      - name: Flutter pub get
-        working-directory: ${{ env.APP_DIR }}
-        run: flutter pub get
-
-      - name: Debug gRPC patch
-        working-directory: ${{ env.APP_DIR }}/ios
+      - name: Pod install and patch gRPC
+        working-directory: ./talabtek_app/ios
         run: |
-          pod install 2>&1 | grep "grpc-patch" || true
-          echo "---- remaining template lines ----"
-          grep -n "template" Pods/gRPC-C++/src/core/lib/promise/detail/basic_seq.h || true
-          echo "---- lines 98-106 ----"
-          sed -n '98,106p' Pods/gRPC-C++/src/core/lib/promise/detail/basic_seq.h
+          pod install
+          F=Pods/gRPC-C++/src/core/lib/promise/detail/basic_seq.h
+          echo "---- before ----"
+          sed -n '98,106p' $F
+          sed -i '' 's/template CallSeqFactory/CallSeqFactory/g' $F
+          echo "---- after ----"
+          sed -n '98,106p' $F
+          grep -n "template" $F || true
 
       - name: Build IPA
         working-directory: ${{ env.APP_DIR }}
