@@ -32,7 +32,7 @@ target 'Runner' do
   use_modular_headers!
 
   flutter_install_all_ios_pods File.dirname(File.realpath(__FILE__))
-
+  
   # Firebase
   pod 'Firebase/Core', '10.18.0'
   pod 'Firebase/Auth', '10.18.0'
@@ -41,15 +41,15 @@ target 'Runner' do
   pod 'Firebase/Messaging', '10.18.0'
   pod 'Firebase/Analytics', '10.18.0'
   pod 'Firebase/Crashlytics', '10.18.0'
-
+  
   # Google Maps
   pod 'GoogleMaps', '8.4.0'
   pod 'GoogleMapsBase', '8.4.0'
   pod 'GoogleMapsCore', '8.4.0'
-
+  
   # Google Sign In
   pod 'GoogleSignIn', '7.0.0'
-
+  
   # Additional pods
   pod 'SDWebImage', '5.18.0'
   pod 'SDWebImageWebPCoder', '0.10.0'
@@ -58,33 +58,18 @@ end
 post_install do |installer|
   installer.pods_project.targets.each do |target|
     flutter_additional_ios_build_settings(target)
-
+    
     target.build_configurations.each do |config|
       config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '13.0'
       config.build_settings['ENABLE_BITCODE'] = 'NO'
-      config.build_settings['ONLY_ACTIVE_ARCH'] = 'NO'
-
+      config.build_settings['ONLY_ACTIVE_ARCH'] = 'YES'
+      
       # For Google Maps
       config.build_settings['GCC_PREPROCESSOR_DEFINITIONS'] ||= [
         '$(inherited)',
         'GMSServices=1',
+        'GRPC_CFSTREAM=1',
       ]
     end
   end
-
-  # Workaround: gRPC-C++ "template" keyword issue with newer Clang
-  grpc_dir = File.join(installer.sandbox.root, 'gRPC-C++')
-  patched_count = 0
-  Dir.glob(File.join(grpc_dir, 'src/core/**/*.{h,cc}')).each do |file|
-    text = File.read(file)
-    # Remove "template" (after ::, . or ->) when not followed by "<"
-    patched = text.gsub(/(::|\.|->)template\s+(\w+)(?!\s*<|\w)/, '\1\2')
-    if patched != text
-      File.chmod(0644, file)
-      File.write(file, patched)
-      patched_count += 1
-      puts "[grpc-patch] patched #{file}"
-    end
-  end
-  puts "[grpc-patch] files patched: #{patched_count}"
 end
