@@ -3,8 +3,9 @@ on:
   workflow_dispatch:
 
 env:
-  BUNDLE_ID: com.your.bundleid
-  PROFILE_NAME: talabtkappstore
+  BUNDLE_ID: com.your.bundleid        # غيّره لمعرّف تطبيقك الحقيقي
+  PROFILE_NAME: talabtkappstore       # اسم الـ profile كما يظهر في بوابة Apple
+  APP_DIR: talabtek_app
 
 jobs:
   build:
@@ -16,8 +17,10 @@ jobs:
         with:
           channel: stable
           cache: true
+          cache-dependency-path: ${{ env.APP_DIR }}/pubspec.lock
 
       - name: Firebase config
+        working-directory: ${{ env.APP_DIR }}
         run: |
           echo -n "${{ secrets.GOOGLE_SERVICE_INFO_PLIST_BASE64 }}" | base64 --decode > ios/Runner/GoogleService-Info.plist
 
@@ -44,7 +47,7 @@ jobs:
 
       - name: Create ExportOptions.plist
         run: |
-          cat > ExportOptions.plist <<EOF
+          cat > $RUNNER_TEMP/ExportOptions.plist <<EOF
           <?xml version="1.0" encoding="UTF-8"?>
           <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
           <plist version="1.0">
@@ -61,9 +64,12 @@ jobs:
           EOF
 
       - name: Build IPA
+        working-directory: ${{ env.APP_DIR }}
         run: |
           flutter pub get
-          flutter build ipa --release --export-options-plist=ExportOptions.plist
+          flutter build ipa --release \
+            --build-number=${{ github.run_number }} \
+            --export-options-plist=$RUNNER_TEMP/ExportOptions.plist
 
       - name: Upload to App Store Connect
         env:
@@ -73,5 +79,5 @@ jobs:
         run: |
           mkdir -p ~/.appstoreconnect/private_keys
           echo -n "$KEY_BASE64" | base64 --decode > ~/.appstoreconnect/private_keys/AuthKey_$KEY_ID.p8
-          xcrun altool --upload-app -f build/ios/ipa/*.ipa -t ios \
+          xcrun altool --upload-app -f $GITHUB_WORKSPACE/${{ env.APP_DIR }}/build/ios/ipa/*.ipa -t ios \
             --apiKey $KEY_ID --apiIssuer $ISSUER_ID
