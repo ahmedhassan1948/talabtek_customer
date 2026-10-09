@@ -28,7 +28,31 @@ jobs:
         working-directory: ./talabtek_app
         run: flutter pub get
 
-      - name: Build iOS
+      - name: Install CocoaPods
+        working-directory: ./talabtek_app/ios
+        run: pod install --repo-update
+
+      - name: Build iOS (simulator - no signing needed)
+        working-directory: ./talabtek_app
+        run: |
+          flutter build ios --release --no-codesign \
+            --build-name=1.0.0 \
+            --build-number=1 \
+            --target-device=simulator
+        env:
+          CODE_SIGNING_ALLOWED: "NO"
+          CODE_SIGN_IDENTITY: ""
+          CODE_SIGNING_REQUIRED: "NO"
+          EXPANDED_CODE_SIGN_IDENTITY: ""
+
+      - name: Upload iOS artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-build-simulator
+          path: talabtek_app/build/ios/iphonesimulator/Runner.app
+          retention-days: 7
+
+      - name: Create IPA (optional - for device)
         working-directory: ./talabtek_app
         run: |
           flutter build ios --release --no-codesign \
@@ -39,15 +63,10 @@ jobs:
           CODE_SIGN_IDENTITY: ""
           CODE_SIGNING_REQUIRED: "NO"
           EXPANDED_CODE_SIGN_IDENTITY: ""
+        continue-on-error: true
 
-      - name: Upload iOS artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: ios-build
-          path: talabtek_app/build/ios/iphoneos/Runner.app
-          retention-days: 7
-
-      - name: Create IPA (optional)
+      - name: Package IPA
+        if: success()
         working-directory: ./talabtek_app
         run: |
           mkdir -p Payload
