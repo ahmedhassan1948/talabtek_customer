@@ -23,9 +23,6 @@ jobs:
       - name: Debug - List repo structure
         run: ls -la
 
-      - name: Debug - Check talabtek_app exists
-        run: ls -la
-
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
@@ -37,7 +34,7 @@ jobs:
         run: flutter pub get
 
       - name: Install CocoaPods
-        working-directory: ./talabtek_app/ios
+        working-directory: ios  # تم التعديل هنا لتكون الإشارة صحيحة داخل talabtek_app/ios
         run: pod install --repo-update
 
       - name: Build iOS (simulator - no signing needed)
