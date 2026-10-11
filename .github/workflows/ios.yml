@@ -1,3 +1,4 @@
+
 name: iOS Build
 
 on:
@@ -11,35 +12,35 @@ jobs:
   build-ios:
     name: Build iOS
     runs-on: macos-latest
-    timeout-minutes: 30
+    timeout-minutes: 40
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Debug - List repo structure
+      - name: Debug - List repository structure
         run: ls -la
 
-      - name: Debug - Check talabtek_app exists
+      - name: Check Flutter app exists
         run: ls -la talabtek_app/
 
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.47.1'
-          channel: 'stable'
+          flutter-version: '3.47.5'
+          channel: stable
           cache: true
 
       - name: Get dependencies
-        working-directory: ./talabtek_app
+        working-directory: talabtek_app
         run: flutter pub get
 
       - name: Install CocoaPods
-        working-directory: ./talabtek_app/ios
+        working-directory: talabtek_app/ios
         run: pod install --repo-update
 
-      - name: Build iOS (device - no codesign)
-        working-directory: ./talabtek_app
+      - name: Build iOS device app
+        working-directory: talabtek_app
         run: |
           flutter build ios --release --no-codesign \
             --build-name=1.0.0 \
@@ -50,25 +51,26 @@ jobs:
           CODE_SIGNING_REQUIRED: "NO"
           EXPANDED_CODE_SIGN_IDENTITY: ""
 
-      - name: Upload iOS artifact
+      - name: Upload iOS app
         uses: actions/upload-artifact@v4
         with:
           name: ios-build-device
           path: talabtek_app/build/ios/iphoneos/Runner.app
+          if-no-files-found: error
           retention-days: 7
 
-      - name: Package IPA
-        working-directory: ./talabtek_app
+      - name: Package IPA for reference
+        working-directory: talabtek_app
         run: |
           mkdir -p Payload
-          cp -r build/ios/iphoneos/Runner.app Payload/
-          zip -r Runner.ipa Payload/Runner.app
-        continue-on-error: true
+          cp -R build/ios/iphoneos/Runner.app Payload/
+          zip -r Runner.ipa Payload
+          rm -rf Payload
 
-      - name: Upload IPA
+      - name: Upload IPA package
         uses: actions/upload-artifact@v4
         with:
-          name: ios-ipa
+          name: ios-ipa-unsigned
           path: talabtek_app/Runner.ipa
+          if-no-files-found: error
           retention-days: 7
-        continue-on-error: true
