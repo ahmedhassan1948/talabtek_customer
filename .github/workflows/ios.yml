@@ -52,6 +52,8 @@ jobs:
             exit 1
           fi
 
+          chmod u+w "$FILE"
+
           python3 - <<'PY'
           from pathlib import Path
 
@@ -68,8 +70,7 @@ jobs:
               print("Applied gRPC compatibility patch.")
           else:
               raise SystemExit(
-                  "Expected template call was not found. "
-                  "Inspect basic_seq.h before applying another patch."
+                  "Expected template call was not found in basic_seq.h."
               )
           PY
 
