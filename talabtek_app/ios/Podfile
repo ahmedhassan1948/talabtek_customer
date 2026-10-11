@@ -56,7 +56,7 @@ post_install do |installer|
       config.build_settings['CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER'] = 'NO'
     end
 
-    # Remove the unsupported compiler flag from BoringSSL-GRPC.
+    # Remove the unsupported warning flag from BoringSSL-GRPC.
     if target.name == 'BoringSSL-GRPC'
       target.source_build_phase.files.each do |file|
         next unless file.settings &&
@@ -66,14 +66,8 @@ post_install do |installer|
         flags.reject! do |flag|
           flag == '-GCC_WARN_INHIBIT_ALL_WARNINGS'
         end
-        file.settings['COMPILER_FLAGS'] = flags.join(' ')
-      end
-    end
 
-    # Work around gRPC C++ template parsing issues on newer Clang.
-    if target.name == 'gRPC-Core'
-      target.build_configurations.each do |config|
-        config.build_settings['CLANG_CXX_LANGUAGE_STANDARD'] = 'gnu++17'
+        file.settings['COMPILER_FLAGS'] = flags.join(' ')
       end
     end
   end
