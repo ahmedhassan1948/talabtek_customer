@@ -39,6 +39,40 @@ jobs:
         working-directory: talabtek_app/ios
         run: pod install --repo-update
 
+      - name: Patch gRPC template compatibility
+        working-directory: talabtek_app/ios
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          FILE="Pods/gRPC-Core/src/core/lib/promise/detail/basic_seq.h"
+
+          if [ ! -f "$FILE" ]; then
+            echo "ERROR: gRPC header not found: $FILE"
+            exit 1
+          fi
+
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path("Pods/gRPC-Core/src/core/lib/promise/detail/basic_seq.h")
+          text = path.read_text()
+
+          old = "Traits::template CallSeqFactory("
+          new = "Traits::CallSeqFactory("
+
+          if new in text:
+              print("Compatibility patch already applied.")
+          elif old in text:
+              path.write_text(text.replace(old, new))
+              print("Applied gRPC compatibility patch.")
+          else:
+              raise SystemExit(
+                  "Expected template call was not found. "
+                  "Inspect basic_seq.h before applying another patch."
+              )
+          PY
+
       - name: Build iOS device app
         working-directory: talabtek_app
         run: |
