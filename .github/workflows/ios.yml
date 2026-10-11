@@ -12,9 +12,6 @@ jobs:
     name: Build iOS
     runs-on: macos-latest
     timeout-minutes: 30
-    defaults:
-      run:
-        working-directory: ./talabtek_app
 
     steps:
       - name: Checkout repository
@@ -22,6 +19,9 @@ jobs:
 
       - name: Debug - List repo structure
         run: ls -la
+
+      - name: Debug - Check talabtek_app exists
+        run: ls -la talabtek_app/
 
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
@@ -31,14 +31,15 @@ jobs:
           cache: true
 
       - name: Get dependencies
+        working-directory: ./talabtek_app
         run: flutter pub get
 
       - name: Install CocoaPods
-        run: |
-          cd ios
-          pod install --repo-update
+        working-directory: ./talabtek_app/ios
+        run: pod install --repo-update
 
       - name: Build iOS (simulator - no signing needed)
+        working-directory: ./talabtek_app
         run: |
           flutter build ios --release --no-codesign \
             --build-name=1.0.0 \
@@ -54,10 +55,11 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: ios-build-simulator
-          path: build/ios/iphonesimulator/Runner.app
+          path: talabtek_app/build/ios/iphonesimulator/Runner.app
           retention-days: 7
 
       - name: Create IPA (optional - for device)
+        working-directory: ./talabtek_app
         run: |
           flutter build ios --release --no-codesign \
             --build-name=1.0.0 \
@@ -71,6 +73,7 @@ jobs:
 
       - name: Package IPA
         if: success()
+        working-directory: ./talabtek_app
         run: |
           mkdir -p Payload
           cp -r build/ios/iphoneos/Runner.app Payload/
@@ -81,6 +84,6 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: ios-ipa
-          path: Runner.ipa
+          path: talabtek_app/Runner.ipa
           retention-days: 7
         continue-on-error: true
