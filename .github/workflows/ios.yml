@@ -45,33 +45,40 @@ jobs:
         run: |
           set -euo pipefail
 
-          FILE="Pods/gRPC-Core/src/core/lib/promise/detail/basic_seq.h"
-
-          if [ ! -f "$FILE" ]; then
-            echo "ERROR: gRPC header not found: $FILE"
-            exit 1
-          fi
-
-          chmod u+w "$FILE"
-
           python3 - <<'PY'
           from pathlib import Path
 
-          path = Path("Pods/gRPC-Core/src/core/lib/promise/detail/basic_seq.h")
-          text = path.read_text()
+          paths = [
+              Path("Pods/gRPC-C++/src/core/lib/promise/detail/basic_seq.h"),
+              Path("Pods/gRPC-Core/src/core/lib/promise/detail/basic_seq.h"),
+          ]
 
           old = "Traits::template CallSeqFactory("
           new = "Traits::CallSeqFactory("
+          found = 0
 
-          if new in text:
-              print("Compatibility patch already applied.")
-          elif old in text:
-              path.write_text(text.replace(old, new))
-              print("Applied gRPC compatibility patch.")
-          else:
-              raise SystemExit(
-                  "Expected template call was not found in basic_seq.h."
-              )
+          for path in paths:
+              if not path.is_file():
+                  print(f"Not present: {path}")
+                  continue
+
+              found += 1
+              path.chmod(path.stat().st_mode | 0o200)
+              text = path.read_text()
+
+              if old in text:
+                  path.write_text(text.replace(old, new))
+                  print(f"Patched: {path}")
+              elif new in text:
+                  print(f"Already patched: {path}")
+              else:
+                  raise SystemExit(
+                      f"Expected expression not found in {path}. "
+                      "Stop and inspect the file rather than guessing."
+                  )
+
+          if found == 0:
+              raise SystemExit("No expected gRPC header files were found.")
           PY
 
       - name: Build iOS device app
