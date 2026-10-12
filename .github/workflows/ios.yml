@@ -35,6 +35,10 @@ jobs:
         working-directory: talabtek_app
         run: flutter pub get
 
+      - name: Patch Firebase headers
+        working-directory: talabtek_app
+        run: python3 tool/patch_firebase_headers.py
+
       - name: Install CocoaPods
         working-directory: talabtek_app/ios
         run: pod install --repo-update
