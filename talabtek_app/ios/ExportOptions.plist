@@ -11,7 +11,7 @@
   <key>provisioningProfiles</key>
   <dict>
     <key>com.talabtk.order</key>
-    <string>talabtk-appstore</string>
+    <string>Talabtek_AppStore_Profile</string>
   </dict>
 </dict>
 </plist>
