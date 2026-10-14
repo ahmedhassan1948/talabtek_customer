@@ -20,9 +20,10 @@ jobs:
           flutter-version: '3.x'
           channel: 'stable'
 
-      # 2. تنظيف وجلب التبعيات مباشرة في الجذر (بدون استخدام cd)
+      # 2. تنظيف وجلب التبعيات بالدخول إلى المجلد الفرعي الصحيح
       - name: Clean and Get Dependencies
         run: |
+          cd talabtek_customer
           flutter clean
           flutter pub get
 
@@ -58,16 +59,16 @@ jobs:
           UUID=$(grep -a -A 1 '<key>UUID</key>' "$PP_PATH" | grep -oE '[-A-Za-z0-9]{36}')
           cp "$PP_PATH" ~/Library/MobileDevice/Provisioning\ Profiles/$UUID.mobileprovision
           echo "Installed Provisioning Profile UUID: $UUID"
-      
 
-      # 6. بناء ملف الـ IPA مباشرة
+      # 6. بناء ملف الـ IPA من داخل المجلد الفرعي مع تحديد مسار ExportOptions.plist الصحيح
       - name: Build IPA
         run: |
+          cd talabtek_customer
           flutter build ipa --release --export-options-plist=ios/ExportOptions.plist
 
-     # 7. حفظ ملف الـ IPA الناتج (Artifact) لتتمكن من تحميله ورفعه ببرنامج Transporter
+      # 7. حفظ ملف الـ IPA الناتج لتحميله ورفعه ببرنامج Transporter
       - name: Upload IPA Artifact
         uses: actions/upload-artifact@v4
         with:
           name: talabtek-customer-ipa
-          path: build/ios/ipa/*.ipa
+          path: talabtek_customer/build/ios/ipa/*.ipa
