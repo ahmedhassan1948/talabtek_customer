@@ -1,122 +1,70 @@
-
-name: iOS Build
+name: iOS Build and Upload
 
 on:
   push:
-    branches: [main, master]
-  pull_request:
-    branches: [main, master]
-  workflow_dispatch:
+    branches:
+      - main # أو اسم الفرع الرئيسي لديك
 
 jobs:
-  build-ios:
-    name: Build iOS
+  build-and-upload:
     runs-on: macos-latest
-    timeout-minutes: 40
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Debug - List repository structure
-        run: ls -la
-
-      - name: Check Flutter app exists
-        run: ls -la talabtek_app/
-
+      # 1. إعداد فلاتر
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.47.5'
-          channel: stable
-          cache: true
+          flutter-version: '3.x' # ضع إصدار فلاتر الذي تستخدمه
+          channel: 'stable'
+
+      # 2. تنظيف ومسح الكاش لضمان عدم تلف الحزمة
+      - name: Clean project
+        run: flutter clean
 
       - name: Get dependencies
-        working-directory: talabtek_app
         run: flutter pub get
 
-      - name: Patch Firebase headers
-        working-directory: talabtek_app
-        run: python3 tool/patch_firebase_headers.py
-
-      - name: Install CocoaPods
-        working-directory: talabtek_app/ios
-        run: pod install --repo-update
-
-      - name: Patch gRPC template compatibility
-        working-directory: talabtek_app/ios
-        shell: bash
+      # 3. إعداد الـ Keychain المؤقت للتوقيع
+      - name: Set up keychain
         run: |
-          set -euo pipefail
+          security create-keychain -p "${{ secrets.KEYCHAIN_PASSWORD }}" build.keychain
+          security default-keychain -s build.keychain
+          security unlock-keychain -p "${{ secrets.KEYCHAIN_PASSWORD }}" build.keychain
+          security set-keychain-settings -t 3600 -l build.keychain
 
-          python3 - <<'PY'
-          from pathlib import Path
-
-          paths = [
-              Path("Pods/gRPC-C++/src/core/lib/promise/detail/basic_seq.h"),
-              Path("Pods/gRPC-Core/src/core/lib/promise/detail/basic_seq.h"),
-          ]
-
-          old = "Traits::template CallSeqFactory("
-          new = "Traits::CallSeqFactory("
-          found = 0
-
-          for path in paths:
-              if not path.is_file():
-                  print(f"Not present: {path}")
-                  continue
-
-              found += 1
-              path.chmod(path.stat().st_mode | 0o200)
-              text = path.read_text()
-
-              if old in text:
-                  path.write_text(text.replace(old, new))
-                  print(f"Patched: {path}")
-              elif new in text:
-                  print(f"Already patched: {path}")
-              else:
-                  raise SystemExit(
-                      f"Expected expression not found in {path}. "
-                      "Stop and inspect the file rather than guessing."
-                  )
-
-          if found == 0:
-              raise SystemExit("No expected gRPC header files were found.")
-          PY
-
-      - name: Build iOS device app
-        working-directory: talabtek_app
-        run: |
-          flutter build ios --release --no-codesign \
-            --build-name=1.0.0 \
-            --build-number=1
+      # 4. تثبيت شهادة التوزيع (Distribution Certificate)
+      - name: Install Apple Certificate
         env:
-          CODE_SIGNING_ALLOWED: "NO"
-          CODE_SIGN_IDENTITY: ""
-          CODE_SIGNING_REQUIRED: "NO"
-          EXPANDED_CODE_SIGN_IDENTITY: ""
-
-      - name: Upload iOS app
-        uses: actions/upload-artifact@v4
-        with:
-          name: ios-build-device
-          path: talabtek_app/build/ios/iphoneos/Runner.app
-          if-no-files-found: error
-          retention-days: 7
-
-      - name: Package IPA for reference
-        working-directory: talabtek_app
+          BUILD_CERTIFICATE_BASE64: ${{ secrets.BUILD_CERTIFICATE_BASE64 }}
+          P12_PASSWORD: ${{ secrets.P12_PASSWORD }}
+          KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
         run: |
-          mkdir -p Payload
-          cp -R build/ios/iphoneos/Runner.app Payload/
-          zip -r Runner.ipa Payload
-          rm -rf Payload
+          CERT_PATH_P12=$(mktemp /tmp/certificate.XXXXXX.p12)
+          echo "$BUILD_CERTIFICATE_BASE64" | base64 --decode > "$CERT_PATH_P12"
+          security import "$CERT_PATH_P12" -P "$P12_PASSWORD" -A -t cert -f pkcs12 -k build.keychain
+          security list-keychain -d user -s build.keychain
+          rm -f "$CERT_PATH_P12"
 
-      - name: Upload IPA package
-        uses: actions/upload-artifact@v4
-        with:
-          name: ios-ipa-unsigned
-          path: talabtek_app/Runner.ipa
-          if-no-files-found: error
-          retention-days: 7
+      # 5. تثبيت ملف الـ Provisioning Profile الذي حللنا مشكلته
+      - name: Install Apple Provisioning Profile
+        env:
+          BUILD_PROVISION_PROFILE_BASE64: ${{ secrets.BUILD_PROVISION_PROFILE_BASE64 }}
+        run: |
+          mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
+          PP_PATH=$(mktemp /tmp/profile.XXXXXX.mobileprovision)
+          echo "$BUILD_PROVISION_PROFILE_BASE64" | base64 --decode > "$PP_PATH"
+          UUID=$(grep -a -A 1 '<key>UUID</key>' "$PP_PATH" | grep -oE '[-A-Za-z0-9]{36}')
+          cp "$PP_PATH" ~/Library/MobileDevice/Provisioning\ Profiles/$UUID.mobileprovision
+          echo "Installed Provisioning Profile UUID: $UUID"
+
+      # 6. بناء التطبيق وصنع ملف الـ IPA بشكل رسمي ونظيف
+      - name: Build IPA
+        run: |
+          flutter build ipa --release --export-options-plist=ios/ExportOptions.plist
+
+      # 7. خطوة الرفع إلى App Store Connect (عبر أداة الرفع أو الأكشن المخصص لديك)
+      # يمكنك وضع خطوة الرفع الخاصة بك هنا للتأكد من إرسال الملف الناتج من مسار:
+      # build/ios/ipa/*.ipa
