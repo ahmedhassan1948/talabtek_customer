@@ -3,7 +3,7 @@ name: iOS Build and Upload
 on:
   push:
     branches:
-      - main # أو اسم الفرع الرئيسي لديك
+      - main
 
 jobs:
   build-and-upload:
@@ -20,14 +20,12 @@ jobs:
           flutter-version: '3.x'
           channel: 'stable'
 
-      # 2. تنظيف وجلب التبعيات من داخل مجلد التطبيق talabtek_customer
-      - name: Clean project
-        working-directory: talabtek_customer
-        run: flutter clean
-
-      - name: Get dependencies
-        working-directory: talabtek_customer
-        run: flutter pub get
+      # 2. تنظيف وجلب التبعيات بالدخول المباشر للمجلد الصحيح
+      - name: Clean and Get Dependencies
+        run: |
+          cd talabtek_customer
+          flutter clean
+          flutter pub get
 
       # 3. إعداد الـ Keychain المؤقت للتوقيع
       - name: Set up keychain
@@ -62,8 +60,8 @@ jobs:
           cp "$PP_PATH" ~/Library/MobileDevice/Provisioning\ Profiles/$UUID.mobileprovision
           echo "Installed Provisioning Profile UUID: $UUID"
 
-      # 6. بناء ملف الـ IPA النظيف داخل مجلد التطبيق
+      # 6. بناء ملف الـ IPA النظيف
       - name: Build IPA
-        working-directory: talabtek_customer
         run: |
+          cd talabtek_customer
           flutter build ipa --release --export-options-plist=ios/ExportOptions.plist
