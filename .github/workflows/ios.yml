@@ -58,8 +58,16 @@ jobs:
           UUID=$(grep -a -A 1 '<key>UUID</key>' "$PP_PATH" | grep -oE '[-A-Za-z0-9]{36}')
           cp "$PP_PATH" ~/Library/MobileDevice/Provisioning\ Profiles/$UUID.mobileprovision
           echo "Installed Provisioning Profile UUID: $UUID"
+      
 
       # 6. بناء ملف الـ IPA مباشرة
       - name: Build IPA
         run: |
           flutter build ipa --release --export-options-plist=ios/ExportOptions.plist
+
+     # 7. حفظ ملف الـ IPA الناتج (Artifact) لتتمكن من تحميله ورفعه ببرنامج Transporter
+      - name: Upload IPA Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: talabtek-customer-ipa
+          path: build/ios/ipa/*.ipa
