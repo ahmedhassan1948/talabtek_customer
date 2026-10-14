@@ -20,10 +20,9 @@ jobs:
           flutter-version: '3.x'
           channel: 'stable'
 
-      # 2. تنظيف وجلب التبعيات بالدخول المباشر للمجلد الصحيح
+      # 2. تنظيف وجلب التبعيات مباشرة في الجذر (بدون استخدام cd)
       - name: Clean and Get Dependencies
         run: |
-          cd talabtek_customer
           flutter clean
           flutter pub get
 
@@ -60,8 +59,7 @@ jobs:
           cp "$PP_PATH" ~/Library/MobileDevice/Provisioning\ Profiles/$UUID.mobileprovision
           echo "Installed Provisioning Profile UUID: $UUID"
 
-      # 6. بناء ملف الـ IPA النظيف
+      # 6. بناء ملف الـ IPA مباشرة
       - name: Build IPA
         run: |
-          cd talabtek_customer
           flutter build ipa --release --export-options-plist=ios/ExportOptions.plist
