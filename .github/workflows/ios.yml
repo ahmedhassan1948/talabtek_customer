@@ -4,27 +4,25 @@ name: iOS Build
 on:
   push:
     branches: [main, master]
+  pull_request:
+    branches: [main, master]
   workflow_dispatch:
-
-permissions:
-  contents: read
 
 jobs:
   build-ios:
-    name: Build and Sign iOS IPA
+    name: Build iOS
     runs-on: macos-latest
-    timeout-minutes: 60
+    timeout-minutes: 40
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Check project structure
-        run: |
-          set -euo pipefail
-          test -f talabtek_app/pubspec.yaml
-          test -f talabtek_app/ios/Runner.xcworkspace/contents.xcworkspacedata
-          echo "Flutter iOS project found."
+      - name: Debug - List repository structure
+        run: ls -la
+
+      - name: Check Flutter app exists
+        run: ls -la talabtek_app/
 
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
@@ -70,303 +68,55 @@ jobs:
 
               found += 1
               path.chmod(path.stat().st_mode | 0o200)
-              content = path.read_text()
+              text = path.read_text()
 
-              if old in content:
-                  path.write_text(content.replace(old, new))
+              if old in text:
+                  path.write_text(text.replace(old, new))
                   print(f"Patched: {path}")
-              elif new in content:
+              elif new in text:
                   print(f"Already patched: {path}")
               else:
                   raise SystemExit(
-                      f"Unexpected gRPC header: {path}"
+                      f"Expected expression not found in {path}. "
+                      "Stop and inspect the file rather than guessing."
                   )
 
           if found == 0:
-              raise SystemExit("No expected gRPC headers found.")
+              raise SystemExit("No expected gRPC header files were found.")
           PY
 
-      - name: Validate signing secrets
-        env:
-          CERTIFICATE_BASE64: ${{ secrets.IOS_CERT_P12_BASE64 }}
-          CERTIFICATE_PASSWORD: ${{ secrets.IOS_CERT_PASSWORD }}
-          PROFILE_BASE64: ${{ secrets.IOS_PROVISION_PROFILE_BASE64 }}
-          TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
-          BUNDLE_ID: ${{ secrets.IOS_BUNDLE_ID }}
-        shell: bash
-        run: |
-          set -euo pipefail
-
-          test -n "$CERTIFICATE_BASE64" || {
-            echo "::error::IOS_CERT_P12_BASE64 is empty or unavailable."
-            exit 1
-          }
-
-          test -n "$CERTIFICATE_PASSWORD" || {
-            echo "::error::IOS_CERT_PASSWORD is empty or unavailable."
-            exit 1
-          }
-
-          test -n "$PROFILE_BASE64" || {
-            echo "::error::IOS_PROVISION_PROFILE_BASE64 is empty or unavailable."
-            exit 1
-          }
-
-          test -n "$TEAM_ID" || {
-            echo "::error::APPLE_TEAM_ID is empty or unavailable."
-            exit 1
-          }
-
-          test -n "$BUNDLE_ID" || {
-            echo "::error::IOS_BUNDLE_ID is empty or unavailable."
-            exit 1
-          }
-
-          echo "All required signing secrets are available."
-
-      - name: Install Apple signing assets
-        env:
-          CERTIFICATE_BASE64: ${{ secrets.IOS_CERT_P12_BASE64 }}
-          CERTIFICATE_PASSWORD: ${{ secrets.IOS_CERT_PASSWORD }}
-          PROFILE_BASE64: ${{ secrets.IOS_PROVISION_PROFILE_BASE64 }}
-        shell: bash
-        run: |
-          set -euo pipefail
-
-          CERT_PATH="$RUNNER_TEMP/distribution.p12"
-          PROFILE_PATH="$RUNNER_TEMP/AppStore.mobileprovision"
-          DECODED_PROFILE="$RUNNER_TEMP/profile.plist"
-          KEYCHAIN_PATH="$RUNNER_TEMP/build.keychain-db"
-          KEYCHAIN_PASSWORD="$(openssl rand -hex 16)"
-
-          echo "$CERTIFICATE_BASE64" |
-            base64 --decode > "$CERT_PATH"
-
-          echo "$PROFILE_BASE64" |
-            base64 --decode > "$PROFILE_PATH"
-
-          security create-keychain \
-            -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
-
-          security set-keychain-settings \
-            -lut 21600 "$KEYCHAIN_PATH"
-
-          security unlock-keychain \
-            -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
-
-          security import "$CERT_PATH" \
-            -P "$CERTIFICATE_PASSWORD" \
-            -A -t cert -f pkcs12 \
-            -k "$KEYCHAIN_PATH"
-
-          security set-keychain-settings \
-            -lut 21600 "$KEYCHAIN_PATH"
-
-          security set-key-partition-list \
-            -S apple-tool:,apple: \
-            -s -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
-
-          security list-keychains -d user \
-            -s "$KEYCHAIN_PATH" login.keychain-db
-
-          security default-keychain \
-            -d user -s "$KEYCHAIN_PATH"
-
-          echo "Available code-signing identities:"
-          security find-identity -v -p codesigning "$KEYCHAIN_PATH"
-
-          security cms -D -i "$PROFILE_PATH" \
-            > "$DECODED_PROFILE"
-
-          PROFILE_UUID=$(
-            /usr/libexec/PlistBuddy \
-              -c 'Print UUID' "$DECODED_PROFILE"
-          )
-
-          PROFILE_NAME=$(
-            /usr/libexec/PlistBuddy \
-              -c 'Print Name' "$DECODED_PROFILE"
-          )
-
-          PROFILE_TEAM=$(
-            /usr/libexec/PlistBuddy \
-              -c 'Print :TeamIdentifier:0' "$DECODED_PROFILE"
-          )
-
-          PROFILE_APP_ID=$(
-            /usr/libexec/PlistBuddy \
-              -c 'Print :Entitlements:application-identifier' \
-              "$DECODED_PROFILE"
-          )
-
-          mkdir -p \
-            "$HOME/Library/MobileDevice/Provisioning Profiles"
-
-          cp "$PROFILE_PATH" \
-            "$HOME/Library/MobileDevice/Provisioning Profiles/$PROFILE_UUID.mobileprovision"
-
-          {
-            echo "PROFILE_UUID=$PROFILE_UUID"
-            echo "PROFILE_NAME=$PROFILE_NAME"
-            echo "PROFILE_TEAM=$PROFILE_TEAM"
-            echo "PROFILE_APP_ID=$PROFILE_APP_ID"
-          } >> "$GITHUB_ENV"
-
-          echo "Provisioning profile installed."
-          echo "Profile name: $PROFILE_NAME"
-          echo "Profile UUID: $PROFILE_UUID"
-          echo "Profile team: $PROFILE_TEAM"
-
-      - name: Validate profile and application ID
-        env:
-          TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
-          BUNDLE_ID: ${{ secrets.IOS_BUNDLE_ID }}
-        shell: bash
-        run: |
-          set -euo pipefail
-
-          if [ "$PROFILE_TEAM" != "$TEAM_ID" ]; then
-            echo "::error::Provisioning Profile Team ID does not match APPLE_TEAM_ID."
-            exit 1
-          fi
-
-          case "$PROFILE_APP_ID" in
-            "$TEAM_ID.$BUNDLE_ID"|"$TEAM_ID".*)
-              ;;
-            *)
-              echo "::error::Provisioning Profile App ID does not match the expected Team ID."
-              exit 1
-              ;;
-          esac
-
-          python3 - "$PROFILE_APP_ID" "$TEAM_ID" "$BUNDLE_ID" <<'PY'
-          import sys
-
-          app_id, team_id, bundle_id = sys.argv[1:]
-
-          profile_bundle = app_id[len(team_id) + 1:]
-
-          if profile_bundle.endswith("*"):
-              prefix = profile_bundle[:-1]
-              if not bundle_id.startswith(prefix):
-                  raise SystemExit(
-                      "Provisioning Profile wildcard does not match Bundle ID."
-                  )
-          elif profile_bundle != bundle_id:
-              raise SystemExit(
-                  "Provisioning Profile Bundle ID does not match IOS_BUNDLE_ID."
-              )
-
-          print("Provisioning Profile matches the application ID.")
-          PY
-
-      - name: Build Flutter iOS files
+      - name: Build iOS device app
         working-directory: talabtek_app
         run: |
           flutter build ios --release --no-codesign \
             --build-name=1.0.0 \
-            --build-number=${{ github.run_number }}
-
-      - name: Create App Store export options
+            --build-number=1
         env:
-          TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
-          BUNDLE_ID: ${{ secrets.IOS_BUNDLE_ID }}
-        run: |
-          set -euo pipefail
+          CODE_SIGNING_ALLOWED: "NO"
+          CODE_SIGN_IDENTITY: ""
+          CODE_SIGNING_REQUIRED: "NO"
+          EXPANDED_CODE_SIGN_IDENTITY: ""
 
-          python3 - <<'PY'
-          import os
-          import plistlib
-
-          options = {
-              "method": "app-store",
-              "teamID": os.environ["TEAM_ID"],
-              "signingStyle": "manual",
-              "provisioningProfiles": {
-                  os.environ["BUNDLE_ID"]: os.environ["PROFILE_NAME"]
-              }
-          }
-
-          with open("talabtek_app/ExportOptions.plist", "wb") as f:
-              plistlib.dump(options, f)
-
-          print("ExportOptions.plist created.")
-          PY
-
-      - name: Archive and sign iOS app
-        working-directory: talabtek_app
-        env:
-          TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
-          BUNDLE_ID: ${{ secrets.IOS_BUNDLE_ID }}
-        run: |
-          set -euo pipefail
-
-          xcodebuild \
-            -workspace ios/Runner.xcworkspace \
-            -scheme Runner \
-            -configuration Release \
-            -destination 'generic/platform=iOS' \
-            -archivePath "$PWD/build/ios/Runner.xcarchive" \
-            DEVELOPMENT_TEAM="$TEAM_ID" \
-            PRODUCT_BUNDLE_IDENTIFIER="$BUNDLE_ID" \
-            CODE_SIGN_STYLE=Manual \
-            CODE_SIGN_IDENTITY="Apple Distribution" \
-            PROVISIONING_PROFILE_SPECIFIER="$PROFILE_NAME" \
-            archive
-
-      - name: Export signed IPA
-        working-directory: talabtek_app
-        run: |
-          set -euo pipefail
-
-          xcodebuild -exportArchive \
-            -archivePath "$PWD/build/ios/Runner.xcarchive" \
-            -exportPath "$PWD/build/ios/ipa" \
-            -exportOptionsPlist "$PWD/ExportOptions.plist"
-
-      - name: Verify signed IPA
-        working-directory: talabtek_app
-        env:
-          BUNDLE_ID: ${{ secrets.IOS_BUNDLE_ID }}
-        run: |
-          set -euo pipefail
-
-          IPA="$(find build/ios/ipa \
-            -maxdepth 1 -name '*.ipa' -print -quit)"
-
-          if [ -z "$IPA" ]; then
-            echo "::error::No IPA file was exported."
-            exit 1
-          fi
-
-          mkdir -p "$RUNNER_TEMP/ipa-check"
-          unzip -q "$IPA" -d "$RUNNER_TEMP/ipa-check"
-
-          APP="$RUNNER_TEMP/ipa-check/Payload/Runner.app"
-
-          test -d "$APP"
-          test -f "$APP/embedded.mobileprovision"
-
-          codesign --verify --deep --strict "$APP"
-
-          ACTUAL_BUNDLE_ID=$(
-            /usr/libexec/PlistBuddy \
-              -c 'Print CFBundleIdentifier' "$APP/Info.plist"
-          )
-
-          if [ "$ACTUAL_BUNDLE_ID" != "$BUNDLE_ID" ]; then
-            echo "::error::IPA Bundle ID does not match IOS_BUNDLE_ID."
-            exit 1
-          fi
-
-          echo "IPA exists and contains embedded.mobileprovision."
-          echo "Bundle ID: $ACTUAL_BUNDLE_ID"
-          echo "Code signature verified."
-
-      - name: Upload signed IPA
+      - name: Upload iOS app
         uses: actions/upload-artifact@v4
         with:
-          name: talabtek-ios-signed
-          path: talabtek_app/build/ios/ipa/*.ipa
+          name: ios-build-device
+          path: talabtek_app/build/ios/iphoneos/Runner.app
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Package IPA for reference
+        working-directory: talabtek_app
+        run: |
+          mkdir -p Payload
+          cp -R build/ios/iphoneos/Runner.app Payload/
+          zip -r Runner.ipa Payload
+          rm -rf Payload
+
+      - name: Upload IPA package
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-ipa-unsigned
+          path: talabtek_app/Runner.ipa
           if-no-files-found: error
           retention-days: 7
