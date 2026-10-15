@@ -1,3 +1,4 @@
+
 name: iOS Build
 
 on:
@@ -9,19 +10,13 @@ on:
 
 jobs:
   build-ios:
-    name: Build iOS
+    name: Build signed iOS IPA
     runs-on: macos-latest
-    timeout-minutes: 40
+    timeout-minutes: 60
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-
-      - name: Debug - List repository structure
-        run: ls -la
-
-      - name: Check Flutter app exists
-        run: ls -la talabtek_app/
 
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
@@ -47,7 +42,6 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-
           python3 - <<'PY'
           from pathlib import Path
 
@@ -55,67 +49,156 @@ jobs:
               Path("Pods/gRPC-C++/src/core/lib/promise/detail/basic_seq.h"),
               Path("Pods/gRPC-Core/src/core/lib/promise/detail/basic_seq.h"),
           ]
-
           old = "Traits::template CallSeqFactory("
           new = "Traits::CallSeqFactory("
           found = 0
 
           for path in paths:
               if not path.is_file():
-                  print(f"Not present: {path}")
                   continue
-
               found += 1
               path.chmod(path.stat().st_mode | 0o200)
               text = path.read_text()
-
               if old in text:
                   path.write_text(text.replace(old, new))
-                  print(f"Patched: {path}")
-              elif new in text:
-                  print(f"Already patched: {path}")
-              else:
-                  raise SystemExit(
-                      f"Expected expression not found in {path}. "
-                      "Stop and inspect the file rather than guessing."
-                  )
+              elif new not in text:
+                  raise SystemExit(f"Unexpected gRPC header: {path}")
 
-          if found == 0:
-              raise SystemExit("No expected gRPC header files were found.")
+          if not found:
+              raise SystemExit("gRPC header not found")
           PY
 
-      - name: Build iOS device app
+      - name: Install Apple signing assets
+        env:
+          CERTIFICATE_BASE64: ${{ secrets.APPLE_CERTIFICATE_BASE64 }}
+          CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          PROFILE_BASE64: ${{ secrets.IOS_PROFILE_BASE64 }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          test -n "$CERTIFICATE_BASE64"
+          test -n "$CERTIFICATE_PASSWORD"
+          test -n "$PROFILE_BASE64"
+
+          CERT_PATH="$RUNNER_TEMP/distribution.p12"
+          PROFILE_PATH="$RUNNER_TEMP/AppStore.mobileprovision"
+          KEYCHAIN_PATH="$RUNNER_TEMP/build.keychain-db"
+          KEYCHAIN_PASSWORD="$(openssl rand -hex 16)"
+
+          echo "$CERTIFICATE_BASE64" | base64 --decode > "$CERT_PATH"
+          echo "$PROFILE_BASE64" | base64 --decode > "$PROFILE_PATH"
+
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+
+          security import "$CERT_PATH" \
+            -P "$CERTIFICATE_PASSWORD" \
+            -A -t cert -f pkcs12 \
+            -k "$KEYCHAIN_PATH"
+
+          security set-key-partition-list \
+            -S apple-tool:,apple: \
+            -s -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+
+          security list-keychains -d user -s "$KEYCHAIN_PATH" login.keychain-db
+
+          PROFILE_UUID=$(
+            security cms -D -i "$PROFILE_PATH" |
+            /usr/libexec/PlistBuddy -c 'Print UUID' /dev/stdin
+          )
+
+          mkdir -p "$HOME/Library/MobileDevice/Provisioning Profiles"
+          cp "$PROFILE_PATH" \
+            "$HOME/Library/MobileDevice/Provisioning Profiles/$PROFILE_UUID.mobileprovision"
+
+          echo "PROFILE_UUID=$PROFILE_UUID" >> "$GITHUB_ENV"
+
+      - name: Build Flutter iOS app
         working-directory: talabtek_app
         run: |
           flutter build ios --release --no-codesign \
             --build-name=1.0.0 \
-            --build-number=1
+            --build-number=${{ github.run_number }}
+
+      - name: Create export options
         env:
-          CODE_SIGNING_ALLOWED: "NO"
-          CODE_SIGN_IDENTITY: ""
-          CODE_SIGNING_REQUIRED: "NO"
-          EXPANDED_CODE_SIGN_IDENTITY: ""
+          TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          BUNDLE_ID: ${{ secrets.IOS_BUNDLE_ID }}
+        run: |
+          set -euo pipefail
+          test -n "$TEAM_ID"
+          test -n "$BUNDLE_ID"
 
-      - name: Upload iOS app
-        uses: actions/upload-artifact@v4
-        with:
-          name: ios-build-device
-          path: talabtek_app/build/ios/iphoneos/Runner.app
-          if-no-files-found: error
-          retention-days: 7
+          python3 - <<'PY'
+          import os
+          import plistlib
 
-      - name: Package IPA for reference
+          data = {
+              "method": "app-store",
+              "teamID": os.environ["TEAM_ID"],
+              "signingStyle": "manual",
+              "provisioningProfiles": {
+                  os.environ["BUNDLE_ID"]: os.environ["PROFILE_UUID"]
+              }
+          }
+
+          with open("talabtek_app/ExportOptions.plist", "wb") as f:
+              plistlib.dump(data, f)
+          PY
+
+      - name: Archive and sign iOS app
+        working-directory: talabtek_app
+        env:
+          TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          BUNDLE_ID: ${{ secrets.IOS_BUNDLE_ID }}
+        run: |
+          set -euo pipefail
+
+          xcodebuild \
+            -workspace ios/Runner.xcworkspace \
+            -scheme Runner \
+            -configuration Release \
+            -destination 'generic/platform=iOS' \
+            -archivePath "$PWD/build/ios/Runner.xcarchive" \
+            DEVELOPMENT_TEAM="$TEAM_ID" \
+            PRODUCT_BUNDLE_IDENTIFIER="$BUNDLE_ID" \
+            CODE_SIGN_STYLE=Manual \
+            PROVISIONING_PROFILE_SPECIFIER="$PROFILE_UUID" \
+            CODE_SIGN_IDENTITY="Apple Distribution" \
+            archive
+
+      - name: Export signed IPA
         working-directory: talabtek_app
         run: |
-          mkdir -p Payload
-          cp -R build/ios/iphoneos/Runner.app Payload/
-          zip -r Runner.ipa Payload
-          rm -rf Payload
+          set -euo pipefail
 
-      - name: Upload IPA package
+          xcodebuild -exportArchive \
+            -archivePath "$PWD/build/ios/Runner.xcarchive" \
+            -exportPath "$PWD/build/ios/ipa" \
+            -exportOptionsPlist "$PWD/ExportOptions.plist"
+
+      - name: Verify signed IPA
+        working-directory: talabtek_app
+        run: |
+          set -euo pipefail
+
+          IPA="$(find build/ios/ipa -maxdepth 1 -name '*.ipa' -print -quit)"
+          test -n "$IPA"
+
+          unzip -l "$IPA" | grep 'Payload/Runner.app/embedded.mobileprovision'
+
+          mkdir -p verify-ipa
+          unzip -q "$IPA" -d verify-ipa
+
+          codesign --verify --deep --strict verify-ipa/Payload/Runner.app
+          codesign -dv verify-ipa/Payload/Runner.app 2>&1
+
+      - name: Upload signed IPA
         uses: actions/upload-artifact@v4
         with:
-          name: ios-ipa-unsigned
-          path: talabtek_app/Runner.ipa
+          name: talabtek-ios-signed
+          path: talabtek_app/build/ios/ipa/*.ipa
           if-no-files-found: error
           retention-days: 7
