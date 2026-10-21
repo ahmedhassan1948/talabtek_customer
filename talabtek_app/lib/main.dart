@@ -19,15 +19,37 @@ import 'shared/services/notification_service.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   
-  await EasyLocalization.ensureInitialized();
-  // على أندرويد يقرأ Firebase الإعدادات من google-services.json تلقائياً
-  await Firebase.initializeApp();
+  // التقاط الأخطاء لمنع الشاشة البيضاء الصامتة
+  FlutterError.onError = (FlutterErrorDetails details) {
+    FlutterError.dumpErrorToConsole(details);
+  };
+
+  try {
+    await EasyLocalization.ensureInitialized();
+  } catch (e) {
+    debugPrint('Error EasyLocalization: $e');
+  }
+
+  try {
+    // تأكد من وجود ملف GoogleService-Info.plist داخل مجلد ios/Runner في مشروعك
+    await Firebase.initializeApp();
+  } catch (e) {
+    debugPrint('Error Firebase: $e');
+  }
   
-  await NotificationService.initialize();
+  try {
+    await NotificationService.initialize();
+  } catch (e) {
+    debugPrint('Error Notification: $e');
+  }
   
   // Initialize network provider
   final networkProvider = NetworkProvider();
-  await networkProvider.initialize();
+  try {
+    await networkProvider.initialize();
+  } catch (e) {
+    debugPrint('Error Network: $e');
+  }
   
   runApp(
     EasyLocalization(
